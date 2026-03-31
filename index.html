@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Trajectory Viewer</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:#0a0e1a;color:#c8d0e0;font-size:13px;height:100vh;overflow:hidden;display:flex;flex-direction:column}
+
+.topbar{background:#101418;border-bottom:1px solid #1e293b;padding:0 16px;display:flex;align-items:stretch;flex-shrink:0;min-height:40px}
+.topbar .tabs{display:flex;align-items:stretch;overflow-x:auto;flex:1}
+.tab{padding:8px 18px;cursor:pointer;color:#64748b;font-size:12px;font-weight:600;border-bottom:2px solid transparent;display:flex;align-items:center;gap:8px;transition:all .15s;white-space:nowrap}
+.tab:hover{color:#94a3b8;background:#141820}
+.tab.active{color:#f0f4ff;border-bottom-color:#94a3b8;background:#141820}
+.tab .t-rating{font-size:10px;font-family:'SF Mono',Consolas,monospace}
+.r-high{background:#14532d;color:#4ade80;padding:2px 6px;border-radius:3px}
+.r-mid{background:#451a03;color:#fbbf24;padding:2px 6px;border-radius:3px}
+.r-low{background:#450a0a;color:#f87171;padding:2px 6px;border-radius:3px}
+.golden-badge{background:#fbbf24;color:#1e293b;padding:2px 6px;border-radius:3px;font-size:9px;font-weight:800}
+.topbar .actions{display:flex;align-items:center;gap:8px;margin-left:auto;padding-left:12px;flex-shrink:0}
+.topbar .new-btn{padding:6px 12px;cursor:pointer;color:#475569;font-size:11px;border:1px solid #1e293b;border-radius:4px;background:none;font-family:inherit;transition:all .15s}
+.topbar .new-btn:hover{color:#94a3b8;border-color:#334155}
+
+.loader{display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;gap:16px}
+.loader .drop{border:2px dashed #1e293b;border-radius:12px;padding:60px 80px;text-align:center;cursor:pointer;transition:border-color .2s}
+.loader .drop:hover,.loader .drop.over{border-color:#94a3b8}
+.loader .drop p{color:#475569;margin-top:8px;font-size:12px}
+.loader .drop h2{color:#94a3b8;font-size:15px}
+input[type=file]{display:none}
+
+.main{display:flex;flex:1;overflow:hidden}
+.convo{flex:1;overflow-y:auto;padding:0 0 80px;background:#0a0e1a}
+
+/* User message */
+.msg-user{padding:16px 24px;border-left:3px solid #3b82f6;margin:14px 24px;border-radius:0 6px 6px 0;background:#141820}
+.msg-user-label{font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:#3b82f6;margin-bottom:6px;font-weight:700}
+.msg-user-text{color:#e2e8f0;font-size:13px;line-height:1.7;white-space:pre-wrap}
+
+/* Assistant message */
+.msg-asst{margin:0 24px 14px 48px;padding:0 0 0 16px;border-left:1px solid #1e293b}
+.step-header{padding:10px 0 4px;color:#475569;font-size:10px;text-transform:uppercase;letter-spacing:1.5px;font-weight:700}
+.asst-text{padding:8px 12px;margin:4px 0;color:#c8d0e0;font-size:13px;line-height:1.7;white-space:pre-wrap;border-radius:4px;background:#0e1218}
+
+/* Tool blocks */
+.tool-block{margin:4px 0;border:1px solid #1a2030;border-radius:4px;background:#0e1218;overflow:hidden}
+.tool-header{padding:6px 10px;display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none}
+.tool-header:hover{background:#141c28}
+.tool-header .arrow{color:#475569;font-size:10px;transition:transform .15s;width:14px;flex-shrink:0}
+.tool-header .arrow.open{transform:rotate(90deg)}
+.tool-badge{display:inline-block;padding:2px 6px;border-radius:3px;font-size:10px;font-weight:700;background:#1e293b;font-family:'SF Mono',Consolas,monospace;flex-shrink:0}
+.tb-bash{color:#60a5fa}.tb-read{color:#4ade80}.tb-edit{color:#fbbf24}.tb-grep{color:#c084fc}.tb-glob{color:#a78bfa}.tb-write{color:#7dd3fc}.tb-task{color:#a8a29e}.tb-todowrite{color:#737373}.tb-apply_patch{color:#fb923c}
+.tool-title{color:#94a3b8;font-size:12px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tool-dur{color:#475569;font-size:10px;font-family:'SF Mono',Consolas,monospace;flex-shrink:0}
+.tool-body{display:none;padding:8px 10px;border-top:1px solid #1a2030}
+.tool-body.open{display:block}
+.codeblock{background:#0a0e14;border:1px solid #151c24;border-radius:4px;padding:8px 10px;overflow-x:auto;white-space:pre-wrap;word-break:break-all;font-size:12px;font-family:'SF Mono',Consolas,monospace;line-height:1.5;margin:4px 0;max-height:400px;overflow-y:auto;color:#94a3b8}
+.codeblock .cmd{color:#e2e8f0}.codeblock .out{color:#64748b}
+.diff{background:#0a0e14;border:1px solid #151c24;border-radius:4px;padding:8px 10px;overflow-x:auto;font-size:12px;font-family:'SF Mono',Consolas,monospace;line-height:1.5;margin:4px 0;max-height:400px;overflow-y:auto}
+.diff .del{background:#1c0a0a;color:#f87171;display:block}.diff .add{background:#0a1c0e;color:#4ade80;display:block}
+.empty-resp{padding:8px 12px;color:#475569;font-size:12px;font-style:italic;margin:4px 0}
+
+/* Rubric sidebar — only shown when rubric data exists */
+.rubric-panel{width:280px;min-width:260px;border-left:1px solid #1e293b;overflow-y:auto;flex-shrink:0;padding:10px;background:#0c1018}
+.rubric-panel.hidden{display:none}
+.rubric-panel h3{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#475569;padding:4px 6px;margin-bottom:4px}
+.rc{padding:6px 8px;margin-bottom:4px;border-radius:4px;border:1px solid #151c24;background:#101418;cursor:pointer;transition:all .15s}
+.rc:hover{border-color:#334155}
+.rc.active{border-color:#475569;background:#141c28}
+.rc .rc-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:2px}
+.rc .rc-num{color:#475569;font-size:9px;font-weight:700}
+.rc .rc-type{font-size:8px;padding:1px 4px;border-radius:2px;font-weight:600}
+.rt-correctness{background:#1e293b;color:#60a5fa}.rt-code_style{background:#1e293b;color:#c084fc}.rt-communication{background:#1e293b;color:#4ade80}.rt-agent_behavior{background:#1e293b;color:#fbbf24}
+.rc .rc-text{color:#64748b;font-size:11px;line-height:1.3;margin-bottom:3px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.rc .rc-text.expanded{-webkit-line-clamp:unset}
+.rc .rc-grade{font-size:11px;font-weight:800}
+.rc-pass{color:#4ade80}.rc-fail{color:#f87171}
+.rc-imp{font-size:8px;color:#334155;float:right}
+.rc-section{margin-top:10px;padding:4px 6px;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:#334155;border-top:1px solid #1e293b}
+
+.statsbar{background:#101418;border-top:1px solid #1e293b;padding:6px 20px;display:flex;gap:20px;flex-shrink:0;color:#64748b;font-size:11px}
+.statsbar b{color:#94a3b8}
+
+::-webkit-scrollbar{width:6px;height:6px}::-webkit-scrollbar-track{background:#0a0e1a}::-webkit-scrollbar-thumb{background:#1e293b;border-radius:3px}::-webkit-scrollbar-thumb:hover{background:#334155}
+</style>
+</head>
+<body>
+<div class="loader" id="loader">
+  <div class="drop" id="dropzone"><h2>Drop a trajectory JSON here</h2><p>or click to browse</p></div>
+  <input type="file" id="fileinput" accept=".json">
+  <input type="file" id="fileinput2" accept=".json" style="display:none">
+</div>
+<div id="app" style="display:none;flex-direction:column;height:100vh">
+  <div class="topbar" id="topbar"></div>
+  <div class="main">
+    <div class="convo" id="convo"></div>
+    <div class="rubric-panel hidden" id="rubric-panel"></div>
+  </div>
+  <div class="statsbar" id="statsbar"></div>
+</div>
+<script>
+var LABELS={bash:'bash',read:'read',edit:'edit',grep:'grep',glob:'glob',write:'write',task:'task',todowrite:'todo',apply_patch:'patch'};
+var DATA=null,currentTrace=null,sectionEls=[];
+
+var dz=document.getElementById('dropzone'),fi=document.getElementById('fileinput'),fi2=document.getElementById('fileinput2');
+dz.addEventListener('click',function(){fi.click()});
+dz.addEventListener('dragover',function(e){e.preventDefault();dz.classList.add('over')});
+dz.addEventListener('dragleave',function(){dz.classList.remove('over')});
+dz.addEventListener('drop',function(e){e.preventDefault();dz.classList.remove('over');if(e.dataTransfer.files[0])loadFile(e.dataTransfer.files[0])});
+fi.addEventListener('change',function(e){if(e.target.files[0])loadFile(e.target.files[0])});
+fi2.addEventListener('change',function(e){if(e.target.files[0])loadFile(e.target.files[0])});
+
+function loadFile(f){
+  var r=new FileReader();
+  r.onload=function(e){
+    try{
+      var raw=JSON.parse(e.target.result);
+      DATA=normalizeData(raw);
+      initApp();
+    }catch(err){alert('Invalid JSON: '+err.message)}
+  };
+  r.readAsText(f);
+}
+
+function openNewFile(){fi2.value='';fi2.click()}
+
+/* ── Normalize any JSON shape into our internal format ── */
+function normalizeData(raw){
+  var data={
+    metadata:{},overall_rating:{},rubrics:{},rubrics_rating:{},trajectories:{}
+  };
+
+  // Carry over known top-level QC fields if they exist
+  if(raw.metadata)Object.assign(data.metadata,raw.metadata);
+  if(raw.overall_rating)data.overall_rating=raw.overall_rating;
+  if(raw.rubrics)data.rubrics=raw.rubrics;
+  if(raw.rubrics_rating)data.rubrics_rating=raw.rubrics_rating;
+
+  // Figure out where the trajectory data lives
+  if(raw.trajectories){
+    data.trajectories=raw.trajectories;
+  }else if(Array.isArray(raw)){
+    data.trajectories={trace_1:raw};
+  }else if(raw.messages||raw.turns){
+    data.trajectories={trace_1:raw};
+  }else if(raw.conversation||raw.trajectory){
+    data.trajectories={trace_1:raw.conversation||raw.trajectory};
+  }else if(raw.trace_1||raw.trace_2||raw.trace_3){
+    ['trace_1','trace_2','trace_3'].forEach(function(k){if(raw[k])data.trajectories[k]=raw[k]});
+  }else if(!raw.metadata){
+    // Unknown shape — try treating the whole object as a single trajectory
+    var skip={'overall_rating':1,'rubrics':1,'rubrics_rating':1};
+    var keys=Object.keys(raw).filter(function(k){return!skip[k]});
+    // If there are a small number of top-level object keys, treat them as separate traces
+    if(keys.length>=1&&keys.length<=5&&keys.every(function(k){return typeof raw[k]==='object'&&raw[k]!==null})){
+      keys.forEach(function(k,i){
+        data.trajectories['trace_'+(i+1)]=raw[k];
+        if(!data.metadata.models)data.metadata.models={};
+        data.metadata.models['trace_'+(i+1)]=k;
+      });
+    }else{
+      data.trajectories={trace_1:raw};
+    }
+  }
+
+  // If we still have nothing, wrap the whole thing
+  if(!Object.keys(data.trajectories).length){
+    data.trajectories={trace_1:raw};
+  }
+
+  var m=data.metadata;
+  m.instance_id=m.instance_id||raw.instance_id||raw.id||raw.name||'';
+  m.golden_trajectory=m.golden_trajectory||{};
+  m.models=m.models||raw.models||{};
+
+  var traceKeys=Object.keys(data.trajectories);
+  traceKeys.forEach(function(tk){if(!m.models[tk])m.models[tk]=tk});
+  traceKeys.forEach(function(tk){if(data.overall_rating[tk]===undefined)data.overall_rating[tk]=null});
+  return data;
+}
+
+/* ── App bootstrap ── */
+function initApp(){
+  document.getElementById('loader').style.display='none';
+  document.getElementById('app').style.display='flex';
+
+  var hasRubrics=Object.keys(DATA.rubrics||{}).length>0;
+  document.getElementById('rubric-panel').classList.toggle('hidden',!hasRubrics);
+
+  renderTopbar();
+  var first=Object.keys(DATA.trajectories)[0]||'trace_1';
+  switchTrace(first);
+}
+
+function rc(r){return r>=4?'r-high':r>=3?'r-mid':'r-low'}
+
+/* ── Top bar: trace tabs + open file ── */
+function renderTopbar(){
+  var m=DATA.metadata||{},o=DATA.overall_rating||{},g=m.golden_trajectory||{},models=m.models||{};
+  var traceKeys=Object.keys(DATA.trajectories||{});
+  if(!traceKeys.length)traceKeys=['trace_1'];
+
+  var tabsHtml='';
+  traceKeys.forEach(function(tk){
+    var label=models[tk]||tk;
+    var rating=o[tk];
+    var ratingHtml=rating!=null?' <span class="t-rating '+rc(rating)+'">'+rating+'/5</span>':'';
+    var goldenHtml=g.source===tk?' <span class="golden-badge">GOLDEN</span>':'';
+    tabsHtml+='<div class="tab" data-trace="'+tk+'" onclick="switchTrace(\''+tk+'\')">'+esc(label)+ratingHtml+goldenHtml+'</div>';
+  });
+
+  var titleHtml='';
+  if(m.instance_id)titleHtml='<span style="color:#64748b;font-size:11px;align-self:center;margin-right:8px">'+esc(m.instance_id)+'</span>';
+
+  document.getElementById('topbar').innerHTML=
+    titleHtml+
+    '<div class="tabs">'+tabsHtml+'</div>'+
+    '<div class="actions"><button class="new-btn" onclick="openNewFile()">Open file</button></div>';
+}
+
+/* ── Switch active trace ── */
+function switchTrace(tk){
+  currentTrace=tk;
+  document.querySelectorAll('.tab').forEach(function(t){t.classList.toggle('active',t.dataset.trace===tk)});
+  renderConversation(DATA.trajectories[tk]);
+  if(Object.keys(DATA.rubrics||{}).length)renderRubricPanel();
+  renderStats(DATA.trajectories[tk]);
+}
+
+/* ── Render the conversation: user prompts + assistant responses ── */
+function renderConversation(traj){
+  sectionEls=[];
+  var el=document.getElementById('convo');
+  if(!traj){el.innerHTML='<div style="padding:40px;color:#475569;text-align:center">No trajectory data for this trace</div>';return}
+
+  var msgs=extractMessages(traj);
+  var html='',stepNum=0,secIdx=0;
+
+  msgs.forEach(function(msg){
+    var role=msg._role,parts=msg._parts||[];
+    if(role==='user'){
+      var text=parts.filter(function(p){return p.type==='text'}).map(function(p){return p.text}).join('\n').trim();
+      html+='<div class="msg-user" data-section="'+secIdx+'"><div class="msg-user-label">User</div><div class="msg-user-text">'+esc(text||'(no content)')+'</div></div>';
+      secIdx++;
+    }else if(role==='assistant'){
+      html+='<div class="msg-asst" data-section="'+secIdx+'">';
+      var hasStep=parts.some(function(p){return p.type==='step-start'}),hasContent=false;
+      parts.forEach(function(p){
+        if(p.type==='step-start'){stepNum++;html+='<div class="step-header">Step '+stepNum+'</div>'}
+        else if(p.type==='step-finish'){}
+        else if(p.type==='text'&&p.text&&p.text.trim()){hasContent=true;html+='<div class="asst-text">'+esc(p.text.trim())+'</div>'}
+        else if(p.type==='tool'){hasContent=true;html+=renderToolBlock(p)}
+      });
+      if(!hasContent)html+='<div class="empty-resp">(no visible response content)</div>';
+      html+='</div>';secIdx++;
+    }
+  });
+
+  if(!html)html='<div style="padding:40px;color:#475569;text-align:center">No messages found in this trajectory</div>';
+  el.innerHTML=html;
+  sectionEls=[];el.querySelectorAll('[data-section]').forEach(function(s){sectionEls.push(s)});
+  el.removeEventListener('scroll',onScroll);el.addEventListener('scroll',onScroll);
+}
+
+/* ── Render a single tool call block ── */
+function renderToolBlock(p){
+  var tn=p.tool||'tool',state=p.state||{},input=state.input||{},output=state.output||'',meta=state.metadata||{},time=state.time||{};
+  var dur=time.start&&time.end?((time.end-time.start)/1000).toFixed(1)+'s':'';
+  var title=state.title||toolLabel(p);
+  var id='t_'+Math.random().toString(36).slice(2,8);
+
+  var html='<div class="tool-block"><div class="tool-header" onclick="toggleTool(\''+id+'\')">';
+  html+='<span class="arrow" id="arr_'+id+'">&#9654;</span>';
+  html+='<span class="tool-badge tb-'+tn+'">'+(LABELS[tn]||tn)+'</span>';
+  html+='<span class="tool-title">'+esc(title)+'</span>';
+  if(dur)html+='<span class="tool-dur">'+dur+'</span>';
+  html+='</div>';
+  html+='<div class="tool-body" id="'+id+'">';
+
+  if(tn==='edit'||tn==='apply_patch'){
+    var old=input.oldString||input.old_string||'',nw=input.newString||input.new_string||'',file=input.filePath||input.file_path||input.path||'';
+    if(file)html+='<div style="color:#475569;font-size:11px;margin-bottom:4px;font-family:SF Mono,Consolas,monospace">'+esc(file)+'</div>';
+    if(old||nw){
+      html+='<div class="diff">';
+      if(old)old.split('\n').forEach(function(l){html+='<span class="del">- '+esc(l)+'</span>'});
+      if(nw)nw.split('\n').forEach(function(l){html+='<span class="add">+ '+esc(l)+'</span>'});
+      html+='</div>';
+    }else if(output){
+      html+='<div class="codeblock">'+esc(trunc(output,3000))+'</div>';
+    }
+  }else if(tn==='bash'){
+    html+='<div class="codeblock"><span class="cmd">$ '+esc(input.command||input.description||'')+'</span></div>';
+    if(output)html+='<div class="codeblock"><span class="out">'+esc(trunc(output,3000))+'</span></div>';
+    if(meta.exit!==undefined)html+='<div style="color:'+(meta.exit===0?'#4ade80':'#f87171')+';font-size:11px;margin-top:3px">exit '+meta.exit+'</div>';
+  }else if(tn==='read'){
+    var fp=input.filePath||input.file_path||input.path||'';
+    if(fp)html+='<div style="color:#475569;font-size:11px;margin-bottom:4px;font-family:SF Mono,Consolas,monospace">'+esc(fp)+'</div>';
+    if(output)html+='<div class="codeblock">'+esc(trunc(output,3000))+'</div>';
+  }else if(tn==='grep'){
+    html+='<div style="color:#475569;font-size:11px;margin-bottom:4px">pattern: <b style="color:#c084fc">'+esc(input.pattern||'')+'</b></div>';
+    if(output)html+='<div class="codeblock">'+esc(trunc(output,2000))+'</div>';
+  }else if(tn==='todowrite'){
+    var todos=input.todos||meta.todos||[];
+    todos.forEach(function(t){
+      var ic=t.status==='completed'?'<span style="color:#4ade80">&#10003;</span>':t.status==='in_progress'?'<span style="color:#fbbf24">&#9654;</span>':'<span style="color:#475569">&#9675;</span>';
+      html+='<div style="padding:2px 0">'+ic+' '+esc(t.content)+'</div>';
+    });
+  }else{
+    var inputStr=JSON.stringify(input,null,2);
+    if(inputStr&&inputStr!=='{}')html+='<div class="codeblock">'+esc(inputStr)+'</div>';
+    if(output)html+='<div class="codeblock">'+esc(trunc(output,2000))+'</div>';
+  }
+
+  html+='</div></div>';
+  return html;
+}
+
+function toggleTool(id){
+  var b=document.getElementById(id),a=document.getElementById('arr_'+id);
+  if(b){b.classList.toggle('open');if(a)a.classList.toggle('open')}
+}
+
+/* ── Rubric sidebar (only rendered when data exists) ── */
+function renderRubricPanel(){
+  var rubrics=DATA.rubrics||{},rr=DATA.rubrics_rating||{},keys=Object.keys(rubrics);
+  var html='<h3>Rubrics ('+keys.length+')</h3>';
+  keys.forEach(function(k,i){
+    var r=rubrics[k]||{},tc='rt-'+(r.type||'').replace(/\s/g,'_');
+    var v=rr[currentTrace]?rr[currentTrace][k]:'?';
+    var gradeClass=v==='PASS'?'rc-pass':v==='FAIL'?'rc-fail':'';
+    html+='<div class="rc" data-rubric="'+i+'" onclick="scrollToRubric('+i+')">'+
+      '<div class="rc-head"><span class="rc-num">R'+(i+1)+'</span><span class="rc-type '+tc+'">'+(r.type||'')+'</span></div>'+
+      '<div class="rc-text">'+esc(r.criterion||'')+'</div>'+
+      '<span class="rc-grade '+gradeClass+'">'+v+'</span>'+
+      '<span class="rc-imp">'+(r.importance==='MUST_FOLLOW'?'MUST':'GOOD')+'</span>'+
+    '</div>';
+  });
+  var o=DATA.overall_rating||{};
+  var traceNum=currentTrace?currentTrace.replace('trace_',''):'1';
+  var rating=o[currentTrace];
+  html+='<div class="rc-section">Overall Rating</div>';
+  html+='<div class="rc" style="cursor:default"><div class="rc-head"><span class="rc-num" style="font-size:14px;color:#f0f4ff">'+(rating!=null?rating+'/5':'N/A')+'</span></div><div class="rc-text expanded" style="color:#94a3b8">'+esc(o['rationale_'+traceNum]||'')+'</div></div>';
+  document.getElementById('rubric-panel').innerHTML=html;
+}
+
+function scrollToRubric(idx){
+  var convo=document.getElementById('convo');
+  var totalH=convo.scrollHeight-convo.clientHeight;
+  if(totalH<=0)return;
+  var rubricCount=Object.keys(DATA.rubrics||{}).length||1;
+  convo.scrollTo({top:(idx/rubricCount)*totalH,behavior:'smooth'});
+}
+
+function onScroll(){
+  var convo=document.getElementById('convo');
+  var frac=convo.scrollTop/(convo.scrollHeight-convo.clientHeight||1);
+  var cards=document.querySelectorAll('.rc[data-rubric]');
+  if(!cards.length)return;
+  var idx=Math.min(Math.floor(frac*cards.length),cards.length-1);
+  cards.forEach(function(c,i){c.classList.toggle('active',i===idx)});
+}
+
+/* ── Extract messages from any trajectory format ── */
+function extractMessages(traj){
+  // Format A: turns-based (simplified trajectory)
+  if(traj.turns&&Array.isArray(traj.turns)&&!traj.messages){
+    var result=[];
+    traj.turns.forEach(function(t){
+      var role=t.role||(t.prompt?'user':null),text=t.content||t.prompt||'';
+      if(role==='user'){result.push({_role:'user',_parts:[{type:'text',text:text}],_raw:t});return}
+      var parts=[];
+      if(text)parts.push({type:'text',text:text});
+      if(Array.isArray(t.actions)){t.actions.forEach(function(a){
+        if(typeof a!=='object'||a===null)return;
+        if(a.type==='read'&&a.file)parts.push({type:'tool',tool:'read',state:{input:{filePath:a.file},output:'(content)',title:a.file.split('/').pop()}});
+        else if(a.type==='edit'&&a.file){
+          var ch=a.changes||[];
+          ch.forEach(function(c){parts.push({type:'tool',tool:'edit',state:{input:{filePath:a.file,oldString:c.old||c.before||'',newString:c.new||c.after||''},output:'Edit applied',title:a.file.split('/').pop()}})});
+          if(!ch.length)parts.push({type:'tool',tool:'edit',state:{input:{filePath:a.file},output:'edited',title:a.file.split('/').pop()}});
+        }
+        else if((a.type==='shell'||a.type==='bash')&&a.command)parts.push({type:'tool',tool:'bash',state:{input:{command:a.command,description:a.command},output:a.result||a.output||'',title:a.command.slice(0,60)}});
+        else if(a.type==='explore')parts.push({type:'text',text:'Explore: '+(a.description||a.query||'')});
+      })}
+      if(t.files_read)t.files_read.forEach(function(f){parts.push({type:'tool',tool:'read',state:{input:{filePath:f},output:'(content)',title:f.split('/').pop()}})});
+      if(t.edits)t.edits.forEach(function(ed){parts.push({type:'tool',tool:'edit',state:{input:{filePath:ed.file||'',oldString:ed.old||ed.before||'',newString:ed.new||ed.after||''},output:'Edit',title:(ed.file||'').split('/').pop()}})});
+      if(t.commands_run)t.commands_run.forEach(function(c){parts.push({type:'tool',tool:'bash',state:{input:{command:c,description:c},output:t.test_result||'',title:c}})});
+      if(parts.length)result.push({_role:'assistant',_parts:parts,_raw:t});
+    });
+    return result;
+  }
+
+  // Format B: messages array (rich trajectory with parts)
+  var raw=[];
+  if(Array.isArray(traj))raw=traj;
+  else if(traj.messages)raw=traj.messages;
+  else return[];
+
+  return raw.filter(function(m){return typeof m==='object'&&m!==null}).map(function(m){
+    // Has info+parts (standard rich format)
+    if(m.info&&m.parts&&m.parts.length>0)return{_role:m.info.role,_parts:m.parts,_raw:m,_tokens:m.info.tokens};
+    // Has role+parts
+    if(m.role&&m.parts&&m.parts.length>0)return{_role:m.role,_parts:m.parts,_raw:m,_tokens:m.tokens};
+    // Has data wrapper
+    if(m.data){
+      var d=m.data;
+      if(typeof d==='string'){try{d=JSON.parse(d)}catch(e){d={}}}
+      if(typeof d==='object'&&d.role){
+        var p=d.parts||[];
+        if(!p.length&&d.summary&&d.summary.diffs){
+          d.summary.diffs.forEach(function(df){
+            p.push({type:'text',text:'File: '+df.file+' (+'+(df.additions||0)+'/-'+(df.deletions||0)+')'});
+            if(df.before&&df.after)p.push({type:'tool',tool:'edit',state:{input:{filePath:df.file,oldString:df.before,newString:df.after},output:'diff',title:df.file.split('/').pop()}});
+          });
+        }
+        if(!p.length&&d.role==='assistant'){
+          var desc=d.modelID||'assistant';
+          if(d.tokens)desc+=' | '+(d.tokens.output||0)+' out';
+          if(d.finish)desc+=' | '+d.finish;
+          p.push({type:'text',text:'['+desc+']'});
+        }
+        if(!p.length&&d.role==='user')p.push({type:'text',text:'(user prompt)'});
+        return{_role:d.role,_parts:p,_raw:m,_tokens:d.tokens};
+      }
+    }
+    // Has role (minimal format)
+    if(m.role){
+      var p=[];
+      if(m.role==='user'){
+        if(m.content)p.push({type:'text',text:typeof m.content==='string'?m.content:JSON.stringify(m.content)});
+        if(m.summary&&m.summary.diffs){
+          m.summary.diffs.forEach(function(df){
+            p.push({type:'text',text:'File: '+df.file+' (+'+(df.additions||0)+'/-'+(df.deletions||0)+')'});
+            if(df.before&&df.after)p.push({type:'tool',tool:'edit',state:{input:{filePath:df.file,oldString:df.before,newString:df.after},output:'diff',title:df.file.split('/').pop()}});
+          });
+        }
+        if(m.files_in_context)p.push({type:'text',text:'Files: '+m.files_in_context.join(', ')});
+        if(!p.length)p.push({type:'text',text:'(user prompt)'});
+      }
+      if(m.role==='assistant'){
+        if(m.content)p.push({type:'text',text:typeof m.content==='string'?m.content:JSON.stringify(m.content)});
+        if(m.tool_calls&&Array.isArray(m.tool_calls)){
+          m.tool_calls.forEach(function(tc){
+            var fn=tc.function||tc;
+            var name=fn.name||fn.type||'tool';
+            var args=fn.arguments||fn.input||{};
+            if(typeof args==='string'){try{args=JSON.parse(args)}catch(e){args={raw:args}}}
+            p.push({type:'tool',tool:name,state:{input:args,output:'',title:name}});
+          });
+        }
+        if(!p.length){
+          var desc=m.modelID||m.model||'assistant';
+          if(m.tokens)desc+=' | '+(m.tokens.output||0)+' out';
+          if(m.finish)desc+=' | '+m.finish;
+          p.push({type:'text',text:'['+desc+']'});
+        }
+      }
+      if(m.role==='tool'||m.role==='function'){
+        return null;
+      }
+      return{_role:m.role,_parts:p,_raw:m,_tokens:m.tokens};
+    }
+    // Has info wrapper
+    if(m.info){
+      var p=[],role=m.info.role||'unknown';
+      if(role==='assistant'&&m.info.tokens)p.push({type:'text',text:'['+(m.info.modelID||'assistant')+' | '+(m.info.tokens.output||0)+' out]'});
+      if(role==='user'){
+        var s=m.info.summary;
+        if(s&&s.diffs)s.diffs.forEach(function(df){
+          p.push({type:'text',text:'File: '+df.file});
+          if(df.before&&df.after)p.push({type:'tool',tool:'edit',state:{input:{filePath:df.file,oldString:df.before,newString:df.after},output:'diff',title:df.file.split('/').pop()}});
+        });
+        if(!p.length)p.push({type:'text',text:'(user prompt)'});
+      }
+      return{_role:role,_parts:p,_raw:m,_tokens:m.info.tokens};
+    }
+    return{_role:'unknown',_parts:[{type:'text',text:JSON.stringify(m).slice(0,200)}],_raw:m};
+  }).filter(Boolean);
+}
+
+/* ── Stats bar ── */
+function renderStats(traj){
+  if(!traj){document.getElementById('statsbar').innerHTML='';return}
+  var msgs=extractMessages(traj),n=msgs.length,tc=0,tt=0,ot=0,cr=0;
+  var info=traj.info||traj.session||{},sm=info.summary||traj.summary||{};
+  var a=sm.additions||info.summary_additions||0,d=sm.deletions||info.summary_deletions||0,f=sm.files||sm.files_changed||info.summary_files||0;
+  var ti=info.time||{},dur=0;
+  if(ti.created&&ti.updated)dur=Math.round((ti.updated-ti.created)/1000);
+  else if(info.time_created&&info.time_updated)dur=Math.round((info.time_updated-info.time_created)/1000);
+
+  msgs.forEach(function(m){
+    var tok=m._tokens||(m._raw&&m._raw.info?m._raw.info.tokens:null)||(m._raw&&m._raw.tokens?m._raw.tokens:null);
+    if(tok){tt+=tok.total||0;ot+=tok.output||0;cr+=(tok.cache?tok.cache.read:0)||0}
+    (m._parts||[]).forEach(function(p){if(p.type==='tool')tc++});
+  });
+
+  var parts=[];
+  parts.push('<span><b>'+n+'</b> messages</span>');
+  if(tc)parts.push('<span><b>'+tc+'</b> tool calls</span>');
+  if(tt)parts.push('<span><b>'+tt.toLocaleString()+'</b> tokens ('+ot.toLocaleString()+' out'+(cr?', '+cr.toLocaleString()+' cached':'')+')</span>');
+  if(a||d)parts.push('<span><b>+'+a+'/-'+d+'</b> lines, <b>'+f+'</b> files</span>');
+  if(dur)parts.push('<span><b>'+Math.floor(dur/60)+'m'+(dur%60)+'s</b></span>');
+  document.getElementById('statsbar').innerHTML=parts.join('');
+}
+
+/* ── Utilities ── */
+function esc(s){if(!s)return'';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+function trunc(s,n){if(!s)return'';s=String(s).trim();return s.length>n?s.slice(0,n)+'\n... (truncated)':s}
+function toolLabel(p){
+  var s=p.state||{},i=s.input||{},t=p.tool||'';
+  if(t==='bash')return i.description||(i.command?i.command.slice(0,60):'')||'bash';
+  if(t==='read')return(i.filePath||i.file_path||i.path||'').split('/').pop()||'read';
+  if(t==='edit'||t==='apply_patch')return(i.filePath||i.file_path||i.path||'').split('/').pop()||'edit';
+  if(t==='write')return(i.filePath||i.file_path||i.path||'').split('/').pop()||'write';
+  if(t==='grep')return'grep: '+(i.pattern||'').slice(0,40);
+  if(t==='glob')return'glob: '+(i.pattern||i.glob_pattern||'').slice(0,40);
+  if(t==='todowrite')return(i.todos?i.todos.length:0)+' todos';
+  if(t==='task')return i.description||'subtask';
+  return s.title||t;
+}
+</script>
+</body>
+</html>
