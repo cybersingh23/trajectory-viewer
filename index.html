@@ -81,6 +81,26 @@ input[type=file]{display:none}
 .statsbar{background:#101418;border-top:1px solid #1e293b;padding:6px 20px;display:flex;gap:20px;flex-shrink:0;color:#64748b;font-size:11px}
 .statsbar b{color:#94a3b8}
 
+/* Prompt navigation panel (left sidebar) */
+.prompt-nav{width:220px;min-width:200px;border-right:1px solid #1e293b;overflow-y:auto;flex-shrink:0;padding:10px;background:#0c1018}
+.prompt-nav h3{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#475569;padding:4px 6px;margin-bottom:4px}
+.pn-item{padding:8px 10px;margin-bottom:4px;border-radius:4px;border:1px solid #151c24;background:#101418;cursor:pointer;transition:all .15s}
+.pn-item:hover{border-color:#334155;background:#141820}
+.pn-item.active{border-color:#3b82f6;background:#141c28}
+.pn-num{display:block;font-size:10px;font-weight:700;color:#3b82f6;margin-bottom:2px}
+.pn-text{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;color:#64748b;font-size:11px;line-height:1.4}
+
+/* Collapsible turn groups */
+.turn-group{border-bottom:1px solid #1a2030}
+.turn-header{padding:8px 24px;display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;transition:background .15s}
+.turn-header:hover{background:#141820}
+.turn-header .arrow{color:#475569;font-size:10px;transition:transform .15s;width:14px;flex-shrink:0}
+.turn-header .arrow.open{transform:rotate(90deg)}
+.turn-num{font-size:11px;font-weight:700;color:#3b82f6;flex-shrink:0}
+.turn-preview{color:#64748b;font-size:11px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.turn-body{display:none}
+.turn-body.open{display:block}
+
 ::-webkit-scrollbar{width:6px;height:6px}::-webkit-scrollbar-track{background:#0a0e1a}::-webkit-scrollbar-thumb{background:#1e293b;border-radius:3px}::-webkit-scrollbar-thumb:hover{background:#334155}
 </style>
 </head>
@@ -93,6 +113,7 @@ input[type=file]{display:none}
 <div id="app" style="display:none;flex-direction:column;height:100vh">
   <div class="topbar" id="topbar"></div>
   <div class="main">
+    <div class="prompt-nav" id="prompt-nav"></div>
     <div class="convo" id="convo"></div>
     <div class="rubric-panel hidden" id="rubric-panel"></div>
   </div>
@@ -231,14 +252,18 @@ function renderTopbar(){
   document.getElementById('topbar').innerHTML=
     titleHtml+
     '<div class="tabs">'+tabsHtml+'</div>'+
-    '<div class="actions"><button class="new-btn" onclick="openNewFile()">Open file</button></div>';
+    '<div class="actions"><button class="new-btn" id="collapse-btn" onclick="toggleAllTurns()">Collapse all</button><button class="new-btn" onclick="openNewFile()">Open file</button></div>';
 }
 
 /* ── Switch active trace ── */
 function switchTrace(tk){
   currentTrace=tk;
+  allCollapsed=false;
+  var btn=document.getElementById('collapse-btn');
+  if(btn)btn.textContent='Collapse all';
   document.querySelectorAll('.tab').forEach(function(t){t.classList.toggle('active',t.dataset.trace===tk)});
   renderConversation(DATA.trajectories[tk]);
+  renderPromptNav(DATA.trajectories[tk]);
   if(Object.keys(DATA.rubrics||{}).length)renderRubricPanel();
   renderStats(DATA.trajectories[tk]);
 }
@@ -250,31 +275,60 @@ function renderConversation(traj){
   if(!traj){el.innerHTML='<div style="padding:40px;color:#475569;text-align:center">No trajectory data for this trace</div>';return}
 
   var msgs=extractMessages(traj);
-  var html='',stepNum=0,secIdx=0;
 
+  var turns=[],cur=null;
   msgs.forEach(function(msg){
-    var role=msg._role,parts=msg._parts||[];
-    if(role==='user'){
-      var text=parts.filter(function(p){return p.type==='text'}).map(function(p){return p.text}).join('\n').trim();
-      html+='<div class="msg-user" data-section="'+secIdx+'"><div class="msg-user-label">User</div><div class="msg-user-text">'+esc(text||'(no content)')+'</div></div>';
-      secIdx++;
-    }else if(role==='assistant'){
-      html+='<div class="msg-asst" data-section="'+secIdx+'">';
-      var hasStep=parts.some(function(p){return p.type==='step-start'}),hasContent=false;
-      parts.forEach(function(p){
+    if(msg._role==='user'){
+      if(cur)turns.push(cur);
+      cur={user:msg,assistants:[]};
+    }else if(msg._role==='assistant'){
+      if(!cur)cur={user:null,assistants:[]};
+      cur.assistants.push(msg);
+    }
+  });
+  if(cur)turns.push(cur);
+
+  var html='',stepNum=0;
+  turns.forEach(function(turn,idx){
+    var userText='';
+    if(turn.user){
+      var uparts=turn.user._parts||[];
+      userText=uparts.filter(function(p){return p.type==='text'}).map(function(p){return p.text}).join('\n').trim();
+    }
+    var preview=userText?userText.slice(0,100):'(no user prompt)';
+
+    html+='<div class="turn-group" id="prompt-'+idx+'" data-prompt="'+idx+'">';
+    html+='<div class="turn-header" onclick="toggleTurn('+idx+')">';
+    html+='<span class="arrow open" id="tarr_'+idx+'">&#9654;</span>';
+    html+='<span class="turn-num">Prompt '+(idx+1)+'</span>';
+    html+='<span class="turn-preview">'+esc(preview)+'</span>';
+    html+='</div>';
+    html+='<div class="turn-body open" id="tbody_'+idx+'">';
+
+    if(turn.user){
+      html+='<div class="msg-user"><div class="msg-user-label">User</div><div class="msg-user-text">'+esc(userText||'(no content)')+'</div></div>';
+    }
+
+    turn.assistants.forEach(function(msg){
+      var aparts=msg._parts||[];
+      html+='<div class="msg-asst">';
+      var hasContent=false;
+      aparts.forEach(function(p){
         if(p.type==='step-start'){stepNum++;html+='<div class="step-header">Step '+stepNum+'</div>'}
         else if(p.type==='step-finish'){}
         else if(p.type==='text'&&p.text&&p.text.trim()){hasContent=true;html+='<div class="asst-text">'+esc(p.text.trim())+'</div>'}
         else if(p.type==='tool'){hasContent=true;html+=renderToolBlock(p)}
       });
       if(!hasContent)html+='<div class="empty-resp">(no visible response content)</div>';
-      html+='</div>';secIdx++;
-    }
+      html+='</div>';
+    });
+
+    html+='</div></div>';
   });
 
   if(!html)html='<div style="padding:40px;color:#475569;text-align:center">No messages found in this trajectory</div>';
   el.innerHTML=html;
-  sectionEls=[];el.querySelectorAll('[data-section]').forEach(function(s){sectionEls.push(s)});
+  sectionEls=[];el.querySelectorAll('.turn-group').forEach(function(s){sectionEls.push(s)});
   el.removeEventListener('scroll',onScroll);el.addEventListener('scroll',onScroll);
 }
 
@@ -336,6 +390,43 @@ function toggleTool(id){
   if(b){b.classList.toggle('open');if(a)a.classList.toggle('open')}
 }
 
+function toggleTurn(idx){
+  var b=document.getElementById('tbody_'+idx),a=document.getElementById('tarr_'+idx);
+  if(b){b.classList.toggle('open');if(a)a.classList.toggle('open')}
+}
+
+var allCollapsed=false;
+function toggleAllTurns(){
+  allCollapsed=!allCollapsed;
+  document.querySelectorAll('.turn-body').forEach(function(b){b.classList.toggle('open',!allCollapsed)});
+  document.querySelectorAll('.turn-header .arrow').forEach(function(a){a.classList.toggle('open',!allCollapsed)});
+  var btn=document.getElementById('collapse-btn');
+  if(btn)btn.textContent=allCollapsed?'Expand all':'Collapse all';
+}
+
+/* ── Prompt navigation panel (left sidebar) ── */
+function renderPromptNav(traj){
+  var el=document.getElementById('prompt-nav');
+  if(!traj){el.innerHTML='';return}
+  var msgs=extractMessages(traj);
+  var prompts=[];
+  msgs.forEach(function(msg){
+    if(msg._role==='user'){
+      var text=(msg._parts||[]).filter(function(p){return p.type==='text'}).map(function(p){return p.text}).join('\n').trim();
+      prompts.push(text||'(no content)');
+    }
+  });
+  if(!prompts.length&&msgs.length){prompts.push('(full trajectory)')}
+  var html='<h3>Prompts ('+prompts.length+')</h3>';
+  prompts.forEach(function(text,i){
+    html+='<div class="pn-item'+(i===0?' active':'')+'" data-prompt="'+i+'" onclick="jumpToPrompt('+i+')">';
+    html+='<span class="pn-num">Prompt '+(i+1)+'</span>';
+    html+='<span class="pn-text">'+esc(text)+'</span>';
+    html+='</div>';
+  });
+  el.innerHTML=html;
+}
+
 /* ── Rubric sidebar (only rendered when data exists) ── */
 function renderRubricPanel(){
   var rubrics=DATA.rubrics||{},rr=DATA.rubrics_rating||{},keys=Object.keys(rubrics);
@@ -367,9 +458,28 @@ function scrollToRubric(idx){
   convo.scrollTo({top:(idx/rubricCount)*totalH,behavior:'smooth'});
 }
 
+function jumpToPrompt(idx){
+  var target=document.getElementById('prompt-'+idx);
+  if(!target)return;
+  var body=document.getElementById('tbody_'+idx),arr=document.getElementById('tarr_'+idx);
+  if(body&&!body.classList.contains('open')){body.classList.add('open');if(arr)arr.classList.add('open')}
+  target.scrollIntoView({behavior:'smooth',block:'start'});
+  document.querySelectorAll('.pn-item').forEach(function(el,i){el.classList.toggle('active',i===idx)});
+}
+
 function onScroll(){
   var convo=document.getElementById('convo');
-  var frac=convo.scrollTop/(convo.scrollHeight-convo.clientHeight||1);
+  var scrollTop=convo.scrollTop;
+  var groups=convo.querySelectorAll('.turn-group');
+  var activeIdx=0;
+  groups.forEach(function(g,i){
+    if(g.offsetTop<=scrollTop+80)activeIdx=i;
+  });
+  document.querySelectorAll('.pn-item').forEach(function(el,i){el.classList.toggle('active',i===activeIdx)});
+  var activeNav=document.querySelector('.pn-item.active');
+  if(activeNav)activeNav.scrollIntoView({behavior:'smooth',block:'nearest'});
+
+  var frac=scrollTop/(convo.scrollHeight-convo.clientHeight||1);
   var cards=document.querySelectorAll('.rc[data-rubric]');
   if(!cards.length)return;
   var idx=Math.min(Math.floor(frac*cards.length),cards.length-1);
