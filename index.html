@@ -140,7 +140,23 @@ function normalizeData(raw){
   if(raw.trajectories){
     data.trajectories=raw.trajectories;
   }else if(Array.isArray(raw)){
-    data.trajectories={trace_1:raw};
+    if(raw.length>0&&raw[0]&&typeof raw[0]==='object'&&Array.isArray(raw[0].messages)){
+      if(raw.length===1){
+        data.trajectories={trace_1:raw[0]};
+        var sess=raw[0];
+        data.metadata.instance_id=data.metadata.instance_id||sess.title||sess.slug||sess.id||'';
+      }else{
+        raw.forEach(function(sess,i){
+          var tk='trace_'+(i+1);
+          data.trajectories[tk]=sess;
+          if(!data.metadata.models)data.metadata.models={};
+          data.metadata.models[tk]=sess.title||sess.slug||sess.id||tk;
+        });
+        if(!data.metadata.instance_id)data.metadata.instance_id=raw[0].title||raw[0].slug||raw[0].id||'';
+      }
+    }else{
+      data.trajectories={trace_1:raw};
+    }
   }else if(raw.messages||raw.turns){
     data.trajectories={trace_1:raw};
   }else if(raw.conversation||raw.trajectory){
@@ -482,10 +498,11 @@ function renderStats(traj){
   if(!traj){document.getElementById('statsbar').innerHTML='';return}
   var msgs=extractMessages(traj),n=msgs.length,tc=0,tt=0,ot=0,cr=0;
   var info=traj.info||traj.session||{},sm=info.summary||traj.summary||{};
-  var a=sm.additions||info.summary_additions||0,d=sm.deletions||info.summary_deletions||0,f=sm.files||sm.files_changed||info.summary_files||0;
+  var a=sm.additions||info.summary_additions||traj.summary_additions||0,d=sm.deletions||info.summary_deletions||traj.summary_deletions||0,f=sm.files||sm.files_changed||info.summary_files||traj.summary_files||0;
   var ti=info.time||{},dur=0;
   if(ti.created&&ti.updated)dur=Math.round((ti.updated-ti.created)/1000);
   else if(info.time_created&&info.time_updated)dur=Math.round((info.time_updated-info.time_created)/1000);
+  else if(traj.time_created&&traj.time_updated)dur=Math.round((traj.time_updated-traj.time_created)/1000);
 
   msgs.forEach(function(m){
     var tok=m._tokens||(m._raw&&m._raw.info?m._raw.info.tokens:null)||(m._raw&&m._raw.tokens?m._raw.tokens:null);
