@@ -49,7 +49,7 @@ input[type=file]{display:none}
 .tool-header .arrow{color:#475569;font-size:10px;transition:transform .15s;width:14px;flex-shrink:0}
 .tool-header .arrow.open{transform:rotate(90deg)}
 .tool-badge{display:inline-block;padding:2px 6px;border-radius:3px;font-size:10px;font-weight:700;background:#1e293b;font-family:'SF Mono',Consolas,monospace;flex-shrink:0}
-.tb-bash{color:#60a5fa}.tb-read{color:#4ade80}.tb-edit{color:#fbbf24}.tb-grep{color:#c084fc}.tb-glob{color:#a78bfa}.tb-write{color:#7dd3fc}.tb-task{color:#a8a29e}.tb-todowrite{color:#737373}.tb-apply_patch{color:#fb923c}
+.tb-bash{color:#60a5fa}.tb-read{color:#4ade80}.tb-edit{color:#fbbf24}.tb-grep{color:#c084fc}.tb-glob{color:#a78bfa}.tb-write{color:#7dd3fc}.tb-task{color:#a8a29e}.tb-todowrite{color:#737373}.tb-apply_patch{color:#fb923c}.tb-question{color:#f0abfc}
 .tool-title{color:#94a3b8;font-size:12px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .tool-dur{color:#475569;font-size:10px;font-family:'SF Mono',Consolas,monospace;flex-shrink:0}
 .tool-body{display:none;padding:8px 10px;border-top:1px solid #1a2030}
@@ -120,7 +120,7 @@ input[type=file]{display:none}
   <div class="statsbar" id="statsbar"></div>
 </div>
 <script>
-var LABELS={bash:'bash',read:'read',edit:'edit',grep:'grep',glob:'glob',write:'write',task:'task',todowrite:'todo',apply_patch:'patch'};
+var LABELS={bash:'bash',read:'read',edit:'edit',grep:'grep',glob:'glob',write:'write',task:'task',todowrite:'todo',apply_patch:'patch',question:'question'};
 var DATA=null,currentTrace=null,sectionEls=[];
 
 var dz=document.getElementById('dropzone'),fi=document.getElementById('fileinput'),fi2=document.getElementById('fileinput2');
@@ -206,12 +206,12 @@ function normalizeData(raw){
   }
 
   var m=data.metadata;
-  m.instance_id=m.instance_id||raw.instance_id||raw.id||raw.name||'';
+  m.instance_id=m.instance_id||raw.instance_id||raw.id||raw.name||raw.task_id||(raw.info?(raw.info.title||raw.info.slug||raw.info.id):'')||m.title||m.session_id||'';
   m.golden_trajectory=m.golden_trajectory||{};
   m.models=m.models||raw.models||{};
 
   var traceKeys=Object.keys(data.trajectories);
-  traceKeys.forEach(function(tk){if(!m.models[tk])m.models[tk]=tk});
+  traceKeys.forEach(function(tk){if(!m.models[tk])m.models[tk]=(raw.info?raw.info.slug:'')||raw.task_id||tk});
   traceKeys.forEach(function(tk){if(data.overall_rating[tk]===undefined)data.overall_rating[tk]=null});
   return data;
 }
@@ -359,7 +359,8 @@ function renderToolBlock(p){
       html+='<div class="codeblock">'+esc(trunc(output,3000))+'</div>';
     }
   }else if(tn==='bash'){
-    html+='<div class="codeblock"><span class="cmd">$ '+esc(input.command||input.description||'')+'</span></div>';
+    var cmd=input.command||input.description||'';
+    if(cmd)html+='<div class="codeblock"><span class="cmd">$ '+esc(cmd)+'</span></div>';
     if(output)html+='<div class="codeblock"><span class="out">'+esc(trunc(output,3000))+'</span></div>';
     if(meta.exit!==undefined)html+='<div style="color:'+(meta.exit===0?'#4ade80':'#f87171')+';font-size:11px;margin-top:3px">exit '+meta.exit+'</div>';
   }else if(tn==='read'){
@@ -375,6 +376,20 @@ function renderToolBlock(p){
       var ic=t.status==='completed'?'<span style="color:#4ade80">&#10003;</span>':t.status==='in_progress'?'<span style="color:#fbbf24">&#9654;</span>':'<span style="color:#475569">&#9675;</span>';
       html+='<div style="padding:2px 0">'+ic+' '+esc(t.content)+'</div>';
     });
+    if(!todos.length&&output)html+='<div class="codeblock">'+esc(trunc(output,2000))+'</div>';
+  }else if(tn==='question'){
+    var questions=input.questions||[];
+    questions.forEach(function(q){
+      html+='<div style="margin-bottom:8px"><div style="color:#94a3b8;font-size:12px;font-weight:600;margin-bottom:4px">'+esc(q.header||q.question||'')+'</div>';
+      if(q.question&&q.header)html+='<div style="color:#c8d0e0;font-size:12px;margin-bottom:4px">'+esc(q.question)+'</div>';
+      if(q.options)q.options.forEach(function(o){
+        html+='<div style="padding:4px 8px;margin:2px 0;background:#141820;border-radius:3px;font-size:11px"><span style="color:#60a5fa">'+esc(o.label||'')+'</span>';
+        if(o.description)html+=' <span style="color:#475569">&mdash; '+esc(o.description)+'</span>';
+        html+='</div>';
+      });
+      html+='</div>';
+    });
+    if(!questions.length&&output)html+='<div class="codeblock">'+esc(trunc(output,2000))+'</div>';
   }else{
     var inputStr=JSON.stringify(input,null,2);
     if(inputStr&&inputStr!=='{}')html+='<div class="codeblock">'+esc(inputStr)+'</div>';
@@ -486,6 +501,50 @@ function onScroll(){
   cards.forEach(function(c,i){c.classList.toggle('active',i===idx)});
 }
 
+/* ── Parse [tool: name] / [output] markers from flat content text ── */
+function parseInlineTools(text){
+  var parts=[],toolRegex=/\[tool:\s*(\w+)\]/g,matches=[],m;
+  while((m=toolRegex.exec(text))!==null)matches.push({name:m[1],start:m.index,end:toolRegex.lastIndex});
+  if(!matches.length){var t=text.trim();return t?[{type:'text',text:t}]:[]}
+
+  var before=text.slice(0,matches[0].start).trim();
+  if(before)parts.push({type:'text',text:before});
+
+  for(var i=0;i<matches.length;i++){
+    var tm=matches[i];
+    var sectionEnd=(i+1<matches.length)?matches[i+1].start:text.length;
+    var section=text.slice(tm.end,sectionEnd);
+    var toolName=tm.name,output='';
+    var outputIdx=section.indexOf('[output]');
+    if(outputIdx!==-1)output=section.slice(outputIdx+8).trim();
+
+    var state={input:{},output:output,title:toolName};
+
+    if(toolName==='todowrite'&&output){
+      try{
+        var bs=output.indexOf('['),be=output.lastIndexOf(']');
+        if(bs!==-1&&be>bs){var todos=JSON.parse(output.slice(bs,be+1));if(Array.isArray(todos))state.input={todos:todos}}
+      }catch(e){}
+    }else if(toolName==='read'&&output){
+      var pm=output.match(/<path>(.*?)<\/path>/),cm=output.match(/<content>([\s\S]*?)<\/content>/);
+      if(pm)state.input={filePath:pm[1]};
+      if(cm)state.output=cm[1].trim();
+      state.title=pm?pm[1].split('/').pop():'read';
+    }else if(toolName==='bash'){
+      state.title=output?output.split('\n')[0].slice(0,60):'bash';
+    }else if(toolName==='write'&&output){
+      var dm=output.match(/<diagnostics\s+file="([^"]+)"/);
+      if(dm)state.input={filePath:dm[1]};
+      state.title=dm?dm[1].split('/').pop():'write';
+    }else if(toolName==='edit'&&output){
+      state.title='edit';
+    }
+
+    parts.push({type:'tool',tool:toolName,state:state});
+  }
+  return parts;
+}
+
 /* ── Extract messages from any trajectory format ── */
 function extractMessages(traj){
   // Format A: turns-based (simplified trajectory)
@@ -495,7 +554,11 @@ function extractMessages(traj){
       var role=t.role||(t.prompt?'user':null),text=t.content||t.prompt||'';
       if(role==='user'){result.push({_role:'user',_parts:[{type:'text',text:text}],_raw:t});return}
       var parts=[];
-      if(text)parts.push({type:'text',text:text});
+      if(text&&text.indexOf('[tool:')!==-1){
+        parts=parseInlineTools(text);
+      }else if(text){
+        parts.push({type:'text',text:text});
+      }
       if(Array.isArray(t.actions)){t.actions.forEach(function(a){
         if(typeof a!=='object'||a===null)return;
         if(a.type==='read'&&a.file)parts.push({type:'tool',tool:'read',state:{input:{filePath:a.file},output:'(content)',title:a.file.split('/').pop()}});
