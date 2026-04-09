@@ -23,10 +23,21 @@ body{font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;back
 .topbar .new-btn:hover{color:#94a3b8;border-color:#334155}
 
 .loader{display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;gap:16px}
-.loader .drop{border:2px dashed #1e293b;border-radius:12px;padding:60px 80px;text-align:center;cursor:pointer;transition:border-color .2s}
-.loader .drop:hover,.loader .drop.over{border-color:#94a3b8}
-.loader .drop p{color:#475569;margin-top:8px;font-size:12px}
-.loader .drop h2{color:#94a3b8;font-size:15px}
+.drop-row{display:flex;gap:16px;align-items:stretch}
+.drop-zone{border:2px dashed #1e293b;border-radius:12px;padding:40px 48px;text-align:center;cursor:pointer;transition:all .2s;min-width:230px;position:relative}
+.drop-zone:hover,.drop-zone.over{border-color:#94a3b8}
+.drop-zone.loaded{border-color:#4ade80;border-style:solid}
+.drop-zone h2{color:#94a3b8;font-size:14px;margin-bottom:4px}
+.drop-zone p{color:#475569;font-size:11px}
+.drop-zone .dz-check{color:#4ade80;font-size:16px;margin-bottom:4px;display:none}
+.drop-zone.loaded .dz-check{display:block}
+.drop-zone.loaded h2{color:#4ade80;font-size:13px}
+.loader-actions{display:flex;gap:12px;align-items:center;margin-top:4px}
+.launch-btn{padding:10px 28px;border-radius:6px;border:none;background:#3b82f6;color:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .15s;opacity:0.3;pointer-events:none}
+.launch-btn.ready{opacity:1;pointer-events:auto}
+.launch-btn.ready:hover{background:#2563eb}
+.skip-link{color:#475569;font-size:11px;cursor:pointer}
+.skip-link:hover{color:#94a3b8}
 input[type=file]{display:none}
 
 .main{display:flex;flex:1;overflow:hidden}
@@ -102,48 +113,144 @@ input[type=file]{display:none}
 .turn-body.open{display:block}
 
 ::-webkit-scrollbar{width:6px;height:6px}::-webkit-scrollbar-track{background:#0a0e1a}::-webkit-scrollbar-thumb{background:#1e293b;border-radius:3px}::-webkit-scrollbar-thumb:hover{background:#334155}
+
+/* Milestone panel */
+.ms-panel{width:300px;min-width:280px;border-left:1px solid #1e293b;overflow-y:auto;flex-shrink:0;padding:10px;background:#0c1018}
+.ms-panel.hidden{display:none}
+.ms-panel h3{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#475569;padding:4px 6px;margin-bottom:4px}
+.ms-card{padding:8px 10px;margin-bottom:6px;border-radius:4px;border:1px solid #151c24;background:#101418;cursor:pointer;transition:all .15s}
+.ms-card:hover{border-color:#334155}
+.ms-card.ms-done{border-left:3px solid #4ade80}
+.ms-card.ms-active{border-left:3px solid #fbbf24}
+.ms-card.ms-pending{border-left:3px solid #334155}
+.ms-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.ms-id{font-size:11px;font-weight:800;color:#f0f4ff;background:#1e3a5f;padding:2px 8px;border-radius:3px}
+.ms-status{font-size:10px;text-transform:capitalize}
+.ms-status-completed{color:#4ade80}
+.ms-status-pending{color:#475569}
+.ms-prompt-text{color:#94a3b8;font-size:11px;line-height:1.5;margin-bottom:6px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;cursor:pointer}
+.ms-prompt-text.expanded{-webkit-line-clamp:unset}
+.ms-toggle{color:#475569;font-size:10px;cursor:pointer;user-select:none;padding:2px 0}
+.ms-toggle:hover{color:#94a3b8}
+.ms-criteria{color:#64748b;font-size:11px;line-height:1.5;padding:6px 8px;background:#0a0e14;border-radius:3px;margin-top:4px;border:1px solid #151c24}
+.ms-turns{font-size:10px;color:#475569;margin-top:6px;font-family:'SF Mono',Consolas,monospace}
+.ms-task-info{padding:8px 10px;margin-bottom:8px;border-radius:4px;background:#101418;border:1px solid #151c24}
+.ms-task-title{color:#f0f4ff;font-size:12px;font-weight:600;margin-bottom:4px}
+.ms-task-desc{color:#64748b;font-size:11px;line-height:1.4;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;cursor:pointer}
+.ms-task-desc.expanded{-webkit-line-clamp:unset}
+
+/* Milestone badges in conversation & nav */
+.ms-badge{display:inline-block;padding:1px 6px;border-radius:3px;font-size:9px;font-weight:800;background:#1e3a5f;color:#60a5fa;margin-left:6px;vertical-align:middle}
+.turn-group.ms-start{border-top:2px solid #1e3a5f}
+.turn-group.ms-start>.turn-header{background:#0c1628}
+.pn-item.ms-start{border-left:3px solid #1e3a5f}
 </style>
 </head>
 <body>
 <div class="loader" id="loader">
-  <div class="drop" id="dropzone"><h2>Drop a trajectory JSON here</h2><p>or click to browse</p></div>
-  <input type="file" id="fileinput" accept=".json">
-  <input type="file" id="fileinput2" accept=".json" style="display:none">
+  <div class="drop-row">
+    <div class="drop-zone" id="dz-traj">
+      <div class="dz-check">&#10003;</div>
+      <h2>Trajectory JSON</h2>
+      <p>opencode_export.json</p>
+    </div>
+    <div class="drop-zone" id="dz-task">
+      <div class="dz-check">&#10003;</div>
+      <h2>Task JSON</h2>
+      <p>task.json</p>
+    </div>
+  </div>
+  <p style="color:#334155;font-size:11px;margin-top:4px">Drop files on each zone, or drop both at once</p>
+  <div class="loader-actions">
+    <button class="launch-btn" id="launch-btn" onclick="launchViewer()">Launch Viewer</button>
+    <span class="skip-link" id="skip-link" style="display:none" onclick="launchViewer()">skip task file &rarr;</span>
+  </div>
+  <input type="file" id="fi-traj" accept=".json">
+  <input type="file" id="fi-task" accept=".json">
+  <input type="file" id="fi-open" accept=".json" style="display:none">
 </div>
 <div id="app" style="display:none;flex-direction:column;height:100vh">
   <div class="topbar" id="topbar"></div>
   <div class="main">
     <div class="prompt-nav" id="prompt-nav"></div>
     <div class="convo" id="convo"></div>
+    <div class="ms-panel hidden" id="ms-panel"></div>
     <div class="rubric-panel hidden" id="rubric-panel"></div>
   </div>
   <div class="statsbar" id="statsbar"></div>
 </div>
 <script>
 var LABELS={bash:'bash',read:'read',edit:'edit',grep:'grep',glob:'glob',write:'write',task:'task',todowrite:'todo',apply_patch:'patch',question:'question'};
-var DATA=null,currentTrace=null,sectionEls=[];
+var DATA=null,TASK=null,MILESTONES=[],MILESTONE_MAP={},currentTrace=null,sectionEls=[];
+var pendingTraj=null,pendingTask=null;
 
-var dz=document.getElementById('dropzone'),fi=document.getElementById('fileinput'),fi2=document.getElementById('fileinput2');
-dz.addEventListener('click',function(){fi.click()});
-dz.addEventListener('dragover',function(e){e.preventDefault();dz.classList.add('over')});
-dz.addEventListener('dragleave',function(){dz.classList.remove('over')});
-dz.addEventListener('drop',function(e){e.preventDefault();dz.classList.remove('over');if(e.dataTransfer.files[0])loadFile(e.dataTransfer.files[0])});
-fi.addEventListener('change',function(e){if(e.target.files[0])loadFile(e.target.files[0])});
-fi2.addEventListener('change',function(e){if(e.target.files[0])loadFile(e.target.files[0])});
+function isTaskFile(raw){return!!(raw.user_intent&&raw.user_intent.milestones)||!!raw.milestone_progress}
 
-function loadFile(f){
+function handleFile(f){
   var r=new FileReader();
   r.onload=function(e){
     try{
       var raw=JSON.parse(e.target.result);
-      DATA=normalizeData(raw);
-      initApp();
+      if(isTaskFile(raw)){
+        pendingTask=raw;
+        document.getElementById('dz-task').classList.add('loaded');
+        document.getElementById('dz-task').querySelector('h2').textContent='Task loaded';
+      }else{
+        pendingTraj=raw;
+        document.getElementById('dz-traj').classList.add('loaded');
+        document.getElementById('dz-traj').querySelector('h2').textContent='Trajectory loaded';
+      }
+      updateLoaderState();
     }catch(err){alert('Invalid JSON: '+err.message)}
   };
   r.readAsText(f);
 }
 
-function openNewFile(){fi2.value='';fi2.click()}
+function handleFiles(files){for(var i=0;i<files.length;i++)handleFile(files[i])}
+
+function updateLoaderState(){
+  var btn=document.getElementById('launch-btn'),skip=document.getElementById('skip-link');
+  if(pendingTraj&&pendingTask){btn.classList.add('ready');skip.style.display='none'}
+  else if(pendingTraj){btn.classList.remove('ready');skip.style.display='inline'}
+  else{btn.classList.remove('ready');skip.style.display='none'}
+}
+
+function launchViewer(){
+  if(!pendingTraj)return;
+  DATA=normalizeData(pendingTraj);
+  TASK=pendingTask;
+  extractMilestones();
+  initApp();
+}
+
+/* Wire up drop zones */
+var dzTraj=document.getElementById('dz-traj'),dzTask=document.getElementById('dz-task');
+var fiTraj=document.getElementById('fi-traj'),fiTask=document.getElementById('fi-task'),fiOpen=document.getElementById('fi-open');
+
+dzTraj.addEventListener('click',function(){fiTraj.click()});
+dzTask.addEventListener('click',function(){fiTask.click()});
+[dzTraj,dzTask].forEach(function(dz){
+  dz.addEventListener('dragover',function(e){e.preventDefault();dz.classList.add('over')});
+  dz.addEventListener('dragleave',function(){dz.classList.remove('over')});
+  dz.addEventListener('drop',function(e){e.preventDefault();dz.classList.remove('over');handleFiles(e.dataTransfer.files)});
+});
+fiTraj.addEventListener('change',function(e){handleFiles(e.target.files)});
+fiTask.addEventListener('change',function(e){handleFiles(e.target.files)});
+fiOpen.addEventListener('change',function(e){if(e.target.files[0])reloadTraj(e.target.files[0])});
+
+function reloadTraj(f){
+  var r=new FileReader();
+  r.onload=function(e){
+    try{
+      var raw=JSON.parse(e.target.result);
+      if(isTaskFile(raw)){TASK=raw;extractMilestones()}
+      else{DATA=normalizeData(raw)}
+      initApp();
+    }catch(err){alert('Invalid JSON: '+err.message)}
+  };
+  r.readAsText(f);
+}
+function openNewFile(){fiOpen.value='';fiOpen.click()}
 
 /* ── Normalize any JSON shape into our internal format ── */
 function normalizeData(raw){
@@ -223,6 +330,7 @@ function initApp(){
 
   var hasRubrics=Object.keys(DATA.rubrics||{}).length>0;
   document.getElementById('rubric-panel').classList.toggle('hidden',!hasRubrics);
+  document.getElementById('ms-panel').classList.toggle('hidden',!MILESTONES.length);
 
   renderTopbar();
   var first=Object.keys(DATA.trajectories)[0]||'trace_1';
@@ -265,6 +373,7 @@ function switchTrace(tk){
   renderConversation(DATA.trajectories[tk]);
   renderPromptNav(DATA.trajectories[tk]);
   if(Object.keys(DATA.rubrics||{}).length)renderRubricPanel();
+  if(MILESTONES.length)renderMilestonePanel();
   renderStats(DATA.trajectories[tk]);
 }
 
@@ -296,11 +405,15 @@ function renderConversation(traj){
       userText=uparts.filter(function(p){return p.type==='text'}).map(function(p){return p.text}).join('\n').trim();
     }
     var preview=userText?userText.slice(0,100):'(no user prompt)';
+    var msStart=MILESTONE_MAP[idx];
+    var msAny=getMilestoneForPrompt(idx);
+    var msBadge=msStart?'<span class="ms-badge">'+msStart.id.toUpperCase()+'</span>':'';
+    var msClass=msStart?' ms-start':'';
 
-    html+='<div class="turn-group" id="prompt-'+idx+'" data-prompt="'+idx+'">';
+    html+='<div class="turn-group'+msClass+'" id="prompt-'+idx+'" data-prompt="'+idx+'">';
     html+='<div class="turn-header" onclick="toggleTurn('+idx+')">';
     html+='<span class="arrow open" id="tarr_'+idx+'">&#9654;</span>';
-    html+='<span class="turn-num">Prompt '+(idx+1)+'</span>';
+    html+='<span class="turn-num">Prompt '+(idx+1)+'</span>'+msBadge;
     html+='<span class="turn-preview">'+esc(preview)+'</span>';
     html+='</div>';
     html+='<div class="turn-body open" id="tbody_'+idx+'">';
@@ -434,8 +547,11 @@ function renderPromptNav(traj){
   if(!prompts.length&&msgs.length){prompts.push('(full trajectory)')}
   var html='<h3>Prompts ('+prompts.length+')</h3>';
   prompts.forEach(function(text,i){
-    html+='<div class="pn-item'+(i===0?' active':'')+'" data-prompt="'+i+'" onclick="jumpToPrompt('+i+')">';
-    html+='<span class="pn-num">Prompt '+(i+1)+'</span>';
+    var msStart=MILESTONE_MAP[i];
+    var msClass=msStart?' ms-start':'';
+    var msBadge=msStart?' <span class="ms-badge">'+msStart.id.toUpperCase()+'</span>':'';
+    html+='<div class="pn-item'+(i===0?' active':'')+msClass+'" data-prompt="'+i+'" onclick="jumpToPrompt('+i+')">';
+    html+='<span class="pn-num">Prompt '+(i+1)+msBadge+'</span>';
     html+='<span class="pn-text">'+esc(text)+'</span>';
     html+='</div>';
   });
@@ -463,6 +579,83 @@ function renderRubricPanel(){
   html+='<div class="rc-section">Overall Rating</div>';
   html+='<div class="rc" style="cursor:default"><div class="rc-head"><span class="rc-num" style="font-size:14px;color:#f0f4ff">'+(rating!=null?rating+'/5':'N/A')+'</span></div><div class="rc-text expanded" style="color:#94a3b8">'+esc(o['rationale_'+traceNum]||'')+'</div></div>';
   document.getElementById('rubric-panel').innerHTML=html;
+}
+
+/* ── Milestone extraction and mapping ── */
+function extractMilestones(){
+  MILESTONES=[];MILESTONE_MAP={};
+  if(!TASK)return;
+  var ms=(TASK.user_intent&&TASK.user_intent.milestones)||TASK.milestones||[];
+  var progress=TASK.milestone_progress||[];
+  MILESTONES=ms.map(function(m,i){
+    var p=null;
+    progress.forEach(function(pr){if(pr.milestone_id===m.milestone_id)p=pr});
+    return{
+      id:m.milestone_id,num:i+1,
+      prompt:m.prompt||'',
+      criteria:m.continuation_criteria||'',
+      interactions:m.planned_interactions_list||[],
+      status:p?p.status:'pending',
+      startTurn:p?p.started_at_turn:null,
+      endTurn:p?p.completed_at_turn:null,
+      turnCount:p?p.turn_count:null
+    };
+  });
+  MILESTONES.forEach(function(ms){
+    if(ms.startTurn)MILESTONE_MAP[ms.startTurn-1]=ms;
+  });
+}
+
+function getMilestoneForPrompt(idx){
+  if(MILESTONE_MAP[idx])return MILESTONE_MAP[idx];
+  for(var i=0;i<MILESTONES.length;i++){
+    var ms=MILESTONES[i];
+    if(ms.startTurn&&ms.endTurn&&idx>=(ms.startTurn-1)&&idx<=(ms.endTurn-1))return ms;
+  }
+  return null;
+}
+
+/* ── Milestone panel (right sidebar) ── */
+function renderMilestonePanel(){
+  var el=document.getElementById('ms-panel');
+  var html='';
+
+  if(TASK){
+    html+='<div class="ms-task-info">';
+    html+='<div class="ms-task-title">'+esc(TASK.task_title||TASK.problem_statement&&TASK.problem_statement.slice(0,60)||'')+'</div>';
+    if(TASK.problem_statement)html+='<div class="ms-task-desc" onclick="this.classList.toggle(\'expanded\')">'+esc(TASK.problem_statement)+'</div>';
+    html+='</div>';
+  }
+
+  html+='<h3>Milestones ('+MILESTONES.length+')</h3>';
+  MILESTONES.forEach(function(ms,i){
+    var sc=ms.status==='completed'?'ms-done':'ms-pending';
+    var promptIdx=ms.startTurn?ms.startTurn-1:i;
+    html+='<div class="ms-card '+sc+'" onclick="jumpToPrompt('+promptIdx+')">';
+    html+='<div class="ms-head">';
+    html+='<span class="ms-id">'+ms.id.toUpperCase()+'</span>';
+    html+='<span class="ms-status ms-status-'+ms.status+'">'+ms.status+'</span>';
+    html+='</div>';
+
+    var pid='msp_'+i;
+    html+='<div class="ms-prompt-text" id="'+pid+'" onclick="event.stopPropagation();this.classList.toggle(\'expanded\')">'+esc(ms.prompt)+'</div>';
+
+    var cid='msc_'+i;
+    html+='<div class="ms-toggle" onclick="event.stopPropagation();toggleMsDetail(\''+cid+'\',this)">&#9654; Continuation criteria</div>';
+    html+='<div id="'+cid+'" style="display:none"><div class="ms-criteria">'+esc(ms.criteria)+'</div></div>';
+
+    if(ms.startTurn)html+='<div class="ms-turns">Turns '+ms.startTurn+'&ndash;'+ms.endTurn+(ms.turnCount!=null?' ('+ms.turnCount+' exchanges)':'')+'</div>';
+    html+='</div>';
+  });
+  el.innerHTML=html;
+}
+
+function toggleMsDetail(id,toggle){
+  var el=document.getElementById(id);
+  if(!el)return;
+  var show=el.style.display==='none';
+  el.style.display=show?'block':'none';
+  if(toggle)toggle.innerHTML=(show?'&#9660;':'&#9654;')+' Continuation criteria';
 }
 
 function scrollToRubric(idx){
