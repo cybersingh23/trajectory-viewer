@@ -5,900 +5,773 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Trajectory Viewer</title>
 <style>
+/* ═══ RESET & BASE ═══ */
+:root {
+  --bg: #06060e;
+  --glass: rgba(255,255,255,0.035);
+  --glass-border: rgba(255,255,255,0.07);
+  --glass-hover: rgba(255,255,255,0.06);
+  --glass-hover-border: rgba(255,255,255,0.12);
+  --text: #e2e8f0;
+  --text-sec: #94a3b8;
+  --text-muted: #64748b;
+  --text-dim: #334155;
+  --blue: #60a5fa;
+  --green: #4ade80;
+  --amber: #fbbf24;
+  --red: #f87171;
+  --purple: #a78bfa;
+  --cyan: #22d3ee;
+  --radius: 14px;
+  --radius-sm: 8px;
+  --mono: 'SF Mono','Cascadia Code','Fira Code',Consolas,monospace;
+}
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:#0a0e1a;color:#c8d0e0;font-size:13px;height:100vh;overflow:hidden;display:flex;flex-direction:column}
+body{font-family:-apple-system,'Inter','Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--text);font-size:13px;height:100vh;overflow:hidden;position:relative}
 
-.topbar{background:#101418;border-bottom:1px solid #1e293b;padding:0 16px;display:flex;align-items:stretch;flex-shrink:0;min-height:40px}
-.topbar .tabs{display:flex;align-items:stretch;overflow-x:auto;flex:1}
-.tab{padding:8px 18px;cursor:pointer;color:#64748b;font-size:12px;font-weight:600;border-bottom:2px solid transparent;display:flex;align-items:center;gap:8px;transition:all .15s;white-space:nowrap}
-.tab:hover{color:#94a3b8;background:#141820}
-.tab.active{color:#f0f4ff;border-bottom-color:#94a3b8;background:#141820}
-.tab .t-rating{font-size:10px;font-family:'SF Mono',Consolas,monospace}
-.r-high{background:#14532d;color:#4ade80;padding:2px 6px;border-radius:3px}
-.r-mid{background:#451a03;color:#fbbf24;padding:2px 6px;border-radius:3px}
-.r-low{background:#450a0a;color:#f87171;padding:2px 6px;border-radius:3px}
-.golden-badge{background:#fbbf24;color:#1e293b;padding:2px 6px;border-radius:3px;font-size:9px;font-weight:800}
-.topbar .actions{display:flex;align-items:center;gap:8px;margin-left:auto;padding-left:12px;flex-shrink:0}
-.topbar .new-btn{padding:6px 12px;cursor:pointer;color:#475569;font-size:11px;border:1px solid #1e293b;border-radius:4px;background:none;font-family:inherit;transition:all .15s}
-.topbar .new-btn:hover{color:#94a3b8;border-color:#334155}
+/* ═══ BACKGROUND ORBS ═══ */
+.bg-orbs{position:fixed;inset:0;z-index:0;overflow:hidden;pointer-events:none}
+.orb{position:absolute;border-radius:50%;filter:blur(100px)}
+.orb-1{width:700px;height:700px;background:rgba(99,102,241,0.07);top:-15%;left:5%;animation:f1 25s ease-in-out infinite}
+.orb-2{width:500px;height:500px;background:rgba(139,92,246,0.05);bottom:0;right:5%;animation:f2 30s ease-in-out infinite}
+.orb-3{width:400px;height:400px;background:rgba(14,165,233,0.04);top:40%;left:45%;animation:f3 20s ease-in-out infinite}
+@keyframes f1{0%,100%{transform:translate(0,0)}50%{transform:translate(50px,40px)}}
+@keyframes f2{0%,100%{transform:translate(0,0)}50%{transform:translate(-40px,-50px)}}
+@keyframes f3{0%,100%{transform:translate(0,0)}50%{transform:translate(30px,-30px)}}
 
-.loader{display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;gap:16px}
-.drop-row{display:flex;gap:16px;align-items:stretch}
-.drop-zone{border:2px dashed #1e293b;border-radius:12px;padding:40px 48px;text-align:center;cursor:pointer;transition:all .2s;min-width:230px;position:relative}
-.drop-zone:hover,.drop-zone.over{border-color:#94a3b8}
-.drop-zone.loaded{border-color:#4ade80;border-style:solid}
-.drop-zone h2{color:#94a3b8;font-size:14px;margin-bottom:4px}
-.drop-zone p{color:#475569;font-size:11px}
-.drop-zone .dz-check{color:#4ade80;font-size:16px;margin-bottom:4px;display:none}
-.drop-zone.loaded .dz-check{display:block}
-.drop-zone.loaded h2{color:#4ade80;font-size:13px}
-.loader-actions{display:flex;gap:12px;align-items:center;margin-top:4px}
-.launch-btn{padding:10px 28px;border-radius:6px;border:none;background:#3b82f6;color:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .15s;opacity:0.3;pointer-events:none}
+/* ═══ GLASS ═══ */
+.glass{background:var(--glass);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border:1px solid var(--glass-border);border-radius:var(--radius);box-shadow:0 8px 32px rgba(0,0,0,0.25),inset 0 1px 0 rgba(255,255,255,0.03)}
+
+/* ═══ LOADER ═══ */
+#loader{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;gap:24px}
+.loader-title{font-size:28px;font-weight:700;letter-spacing:-0.5px;background:linear-gradient(135deg,#e2e8f0,#94a3b8);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.loader-sub{color:var(--text-muted);font-size:12px;margin-top:-16px}
+.drop-zone{width:520px;padding:60px 40px;text-align:center;border:2px dashed rgba(255,255,255,0.08);border-radius:20px;cursor:pointer;transition:all .3s;background:rgba(255,255,255,0.015)}
+.drop-zone:hover,.drop-zone.over{border-color:var(--blue);background:rgba(96,165,250,0.03)}
+.drop-zone.loaded{border-color:var(--green);border-style:solid;background:rgba(74,222,128,0.03)}
+.dz-icon{font-size:36px;margin-bottom:12px;opacity:0.5}
+.drop-zone h2{color:var(--text-sec);font-size:15px;font-weight:600;margin-bottom:6px}
+.drop-zone p{color:var(--text-muted);font-size:11px;line-height:1.6}
+.drop-zone.loaded h2{color:var(--green)}
+.drop-zone.loaded .dz-icon{opacity:1}
+.load-status{color:var(--text-muted);font-size:11px;min-height:16px}
+.launch-btn{padding:12px 36px;border-radius:10px;border:none;background:linear-gradient(135deg,#3b82f6,#6366f1);color:#fff;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .2s;opacity:0.3;pointer-events:none;box-shadow:0 4px 20px rgba(99,102,241,0.3)}
 .launch-btn.ready{opacity:1;pointer-events:auto}
-.launch-btn.ready:hover{background:#2563eb}
-.skip-link{color:#475569;font-size:11px;cursor:pointer}
-.skip-link:hover{color:#94a3b8}
+.launch-btn.ready:hover{transform:translateY(-1px);box-shadow:0 6px 28px rgba(99,102,241,0.4)}
 input[type=file]{display:none}
 
-.main{display:flex;flex:1;overflow:hidden}
-.convo{flex:1;overflow-y:auto;padding:0 0 80px;background:#0a0e1a}
+/* ═══ APP SHELL ═══ */
+#app{position:relative;z-index:1;display:none;flex-direction:column;height:100vh}
+.topbar{background:rgba(8,8,22,0.7);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-bottom:1px solid var(--glass-border);padding:0 20px;display:flex;align-items:stretch;flex-shrink:0;min-height:46px;z-index:10}
+.task-title{display:flex;align-items:center;gap:8px;margin-right:16px;flex-shrink:0;overflow:hidden}
+.task-title .tt-name{color:var(--text);font-size:13px;font-weight:600;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tt-badge{padding:2px 8px;border-radius:5px;font-size:10px;font-weight:600;background:rgba(255,255,255,0.05);color:var(--text-sec);border:1px solid rgba(255,255,255,0.05);white-space:nowrap}
+.tt-badge.warn{color:var(--red);background:rgba(248,113,113,0.08);border-color:rgba(248,113,113,0.15)}
+.tabs{display:flex;align-items:stretch;overflow-x:auto;flex:1;gap:2px}
+.tab{padding:10px 20px;cursor:pointer;color:var(--text-muted);font-size:12px;font-weight:600;border-bottom:2px solid transparent;display:flex;align-items:center;gap:8px;transition:all .15s;white-space:nowrap}
+.tab:hover{color:var(--text-sec);background:rgba(255,255,255,0.02)}
+.tab.active{color:var(--text);border-bottom-color:var(--blue)}
+.tab.compare-tab{color:var(--purple)}
+.tab.compare-tab.active{color:var(--purple);border-bottom-color:var(--purple)}
+.tab .t-status{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.t-ok{background:var(--green)}.t-warn{background:var(--red)}
+.topbar .actions{display:flex;align-items:center;gap:8px;margin-left:auto;padding-left:12px;flex-shrink:0}
+.topbar .act-btn{padding:6px 14px;cursor:pointer;color:var(--text-muted);font-size:11px;border:1px solid var(--glass-border);border-radius:7px;background:transparent;font-family:inherit;transition:all .15s}
+.topbar .act-btn:hover{color:var(--text-sec);border-color:var(--glass-hover-border);background:rgba(255,255,255,0.03)}
 
-/* User message */
-.msg-user{padding:16px 24px;border-left:3px solid #3b82f6;margin:14px 24px;border-radius:0 6px 6px 0;background:#141820}
-.msg-user-label{font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:#3b82f6;margin-bottom:6px;font-weight:700}
-.msg-user-text{color:#e2e8f0;font-size:13px;line-height:1.7;white-space:pre-wrap}
+/* ═══ COMPARE VIEW ═══ */
+#compare-view{flex:1;overflow-y:auto;padding:28px;display:none}
+.cv-problem-wrap{margin-bottom:20px;padding:14px 18px;cursor:pointer;font-size:12px;color:var(--text-muted);line-height:1.7}
+.cv-problem-wrap summary{font-size:11px;font-weight:600;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px;cursor:pointer;outline:none}
+.cv-problem-wrap summary::-webkit-details-marker{color:var(--text-dim)}
+.cv-problem-text{margin-top:10px}
 
-/* Assistant message */
-.msg-asst{margin:0 24px 14px 48px;padding:0 0 0 16px;border-left:1px solid #1e293b}
-.step-header{padding:10px 0 4px;color:#475569;font-size:10px;text-transform:uppercase;letter-spacing:1.5px;font-weight:700}
-.asst-text{padding:8px 12px;margin:4px 0;color:#c8d0e0;font-size:13px;line-height:1.7;white-space:pre-wrap;border-radius:4px;background:#0e1218}
+.metric-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin-bottom:24px}
+.metric-card{padding:18px;transition:all .2s;cursor:pointer}
+.metric-card:hover{border-color:var(--glass-hover-border);background:var(--glass-hover);transform:translateY(-2px)}
+.mc-name{font-size:14px;font-weight:700;color:var(--text);margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.mc-name .mc-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.mc-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:5px}
+.mc-label{color:var(--text-muted);font-size:11px}
+.mc-value{font-size:12px;font-weight:700;font-family:var(--mono)}
+.progress-track{background:rgba(255,255,255,0.04);border-radius:6px;height:5px;overflow:hidden;margin-bottom:12px}
+.progress-fill{height:100%;border-radius:6px;transition:width .8s cubic-bezier(.4,0,.2,1)}
+.pf-green{background:linear-gradient(90deg,#22c55e,#4ade80)}
+.pf-blue{background:linear-gradient(90deg,#3b82f6,#60a5fa)}
+.pf-red{background:linear-gradient(90deg,#dc2626,#f87171)}
 
-/* Tool blocks */
-.tool-block{margin:4px 0;border:1px solid #1a2030;border-radius:4px;background:#0e1218;overflow:hidden}
-.tool-header{padding:6px 10px;display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none}
-.tool-header:hover{background:#141c28}
-.tool-header .arrow{color:#475569;font-size:10px;transition:transform .15s;width:14px;flex-shrink:0}
-.tool-header .arrow.open{transform:rotate(90deg)}
-.tool-badge{display:inline-block;padding:2px 6px;border-radius:3px;font-size:10px;font-weight:700;background:#1e293b;font-family:'SF Mono',Consolas,monospace;flex-shrink:0}
-.tb-bash{color:#60a5fa}.tb-read{color:#4ade80}.tb-edit{color:#fbbf24}.tb-grep{color:#c084fc}.tb-glob{color:#a78bfa}.tb-write{color:#7dd3fc}.tb-task{color:#a8a29e}.tb-todowrite{color:#737373}.tb-apply_patch{color:#fb923c}.tb-question{color:#f0abfc}
-.tool-title{color:#94a3b8;font-size:12px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.tool-dur{color:#475569;font-size:10px;font-family:'SF Mono',Consolas,monospace;flex-shrink:0}
-.tool-body{display:none;padding:8px 10px;border-top:1px solid #1a2030}
-.tool-body.open{display:block}
-.codeblock{background:#0a0e14;border:1px solid #151c24;border-radius:4px;padding:8px 10px;overflow-x:auto;white-space:pre-wrap;word-break:break-all;font-size:12px;font-family:'SF Mono',Consolas,monospace;line-height:1.5;margin:4px 0;max-height:400px;overflow-y:auto;color:#94a3b8}
-.codeblock .cmd{color:#e2e8f0}.codeblock .out{color:#64748b}
-.diff{background:#0a0e14;border:1px solid #151c24;border-radius:4px;padding:8px 10px;overflow-x:auto;font-size:12px;font-family:'SF Mono',Consolas,monospace;line-height:1.5;margin:4px 0;max-height:400px;overflow-y:auto}
-.diff .del{background:#1c0a0a;color:#f87171;display:block}.diff .add{background:#0a1c0e;color:#4ade80;display:block}
-.empty-resp{padding:8px 12px;color:#475569;font-size:12px;font-style:italic;margin:4px 0}
+.cv-table-wrap{padding:20px}
+.cv-table-wrap h3{font-size:11px;text-transform:uppercase;letter-spacing:1.2px;color:var(--text-muted);margin-bottom:12px;font-weight:700}
+.cv-table{width:100%;border-collapse:separate;border-spacing:0}
+.cv-table th{padding:9px 12px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--text-dim);font-weight:700;background:rgba(255,255,255,0.015);border-bottom:1px solid var(--glass-border)}
+.cv-table td{padding:9px 12px;font-size:12px;border-bottom:1px solid rgba(255,255,255,0.03);color:var(--text-sec);vertical-align:middle}
+.cv-table tr:hover td{background:rgba(255,255,255,0.015)}
+.cv-table td:first-child{font-weight:700;color:var(--text)}
+.cell-pass{color:var(--green)}.cell-fail{color:var(--red)}.cell-wip{color:var(--amber)}
+.cell-turns{font-family:var(--mono);font-size:10px;color:var(--text-muted);margin-left:4px}
 
-/* Rubric sidebar — only shown when rubric data exists */
-.rubric-panel{width:280px;min-width:260px;border-left:1px solid #1e293b;overflow-y:auto;flex-shrink:0;padding:10px;background:#0c1018}
-.rubric-panel.hidden{display:none}
-.rubric-panel h3{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#475569;padding:4px 6px;margin-bottom:4px}
-.rc{padding:6px 8px;margin-bottom:4px;border-radius:4px;border:1px solid #151c24;background:#101418;cursor:pointer;transition:all .15s}
-.rc:hover{border-color:#334155}
-.rc.active{border-color:#475569;background:#141c28}
-.rc .rc-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:2px}
-.rc .rc-num{color:#475569;font-size:9px;font-weight:700}
-.rc .rc-type{font-size:8px;padding:1px 4px;border-radius:2px;font-weight:600}
-.rt-correctness{background:#1e293b;color:#60a5fa}.rt-code_style{background:#1e293b;color:#c084fc}.rt-communication{background:#1e293b;color:#4ade80}.rt-agent_behavior{background:#1e293b;color:#fbbf24}
-.rc .rc-text{color:#64748b;font-size:11px;line-height:1.3;margin-bottom:3px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.rc .rc-text.expanded{-webkit-line-clamp:unset}
-.rc .rc-grade{font-size:11px;font-weight:800}
-.rc-pass{color:#4ade80}.rc-fail{color:#f87171}
-.rc-imp{font-size:8px;color:#334155;float:right}
-.rc-section{margin-top:10px;padding:4px 6px;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:#334155;border-top:1px solid #1e293b}
-
-.statsbar{background:#101418;border-top:1px solid #1e293b;padding:6px 20px;display:flex;gap:20px;flex-shrink:0;color:#64748b;font-size:11px}
-.statsbar b{color:#94a3b8}
-
-/* Prompt navigation panel (left sidebar) */
-.prompt-nav{width:220px;min-width:200px;border-right:1px solid #1e293b;overflow-y:auto;flex-shrink:0;padding:10px;background:#0c1018}
-.prompt-nav h3{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#475569;padding:4px 6px;margin-bottom:4px}
-.pn-item{padding:8px 10px;margin-bottom:4px;border-radius:4px;border:1px solid #151c24;background:#101418;cursor:pointer;transition:all .15s}
-.pn-item:hover{border-color:#334155;background:#141820}
-.pn-item.active{border-color:#3b82f6;background:#141c28}
-.pn-num{display:block;font-size:10px;font-weight:700;color:#3b82f6;margin-bottom:2px}
-.pn-text{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;color:#64748b;font-size:11px;line-height:1.4}
-
-/* Collapsible turn groups */
-.turn-group{border-bottom:1px solid #1a2030}
-.turn-header{padding:8px 24px;display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;transition:background .15s}
-.turn-header:hover{background:#141820}
-.turn-header .arrow{color:#475569;font-size:10px;transition:transform .15s;width:14px;flex-shrink:0}
+/* ═══ MODEL VIEW ═══ */
+#model-view{flex:1;display:none;flex-direction:column;overflow:hidden}
+.mv-body{display:flex;flex:1;overflow:hidden}
+.convo{flex:1;overflow-y:auto;padding:0 0 80px}
+.turn-group{border-bottom:1px solid rgba(255,255,255,0.03)}
+.turn-group.ms-start{border-top:2px solid rgba(139,92,246,0.2)}
+.turn-group.ms-start>.turn-header{background:rgba(139,92,246,0.03)}
+.turn-header{padding:10px 24px;display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;transition:background .15s}
+.turn-header:hover{background:rgba(255,255,255,0.02)}
+.turn-header .arrow{color:var(--text-muted);font-size:10px;transition:transform .15s;width:14px;flex-shrink:0}
 .turn-header .arrow.open{transform:rotate(90deg)}
-.turn-num{font-size:11px;font-weight:700;color:#3b82f6;flex-shrink:0}
-.turn-preview{color:#64748b;font-size:11px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.turn-body{display:none}
-.turn-body.open{display:block}
+.turn-num{font-size:11px;font-weight:700;color:var(--blue);flex-shrink:0}
+.turn-preview{color:var(--text-muted);font-size:11px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.turn-body{display:none}.turn-body.open{display:block}
+.ms-badge{display:inline-block;padding:1px 5px;border-radius:4px;font-size:9px;font-weight:800;background:rgba(139,92,246,0.15);color:var(--purple);margin-left:4px}
 
-::-webkit-scrollbar{width:6px;height:6px}::-webkit-scrollbar-track{background:#0a0e1a}::-webkit-scrollbar-thumb{background:#1e293b;border-radius:3px}::-webkit-scrollbar-thumb:hover{background:#334155}
+.msg-user{padding:14px 20px;border-left:3px solid var(--blue);margin:12px 24px;border-radius:0 var(--radius-sm) var(--radius-sm) 0;background:rgba(96,165,250,0.04)}
+.msg-user-label{font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--blue);margin-bottom:6px;font-weight:700}
+.msg-user-text{color:var(--text);font-size:13px;line-height:1.7;white-space:pre-wrap}
+.msg-asst{margin:0 24px 12px 48px;padding:0 0 0 16px;border-left:1px solid rgba(255,255,255,0.04)}
+.step-header{padding:8px 0 4px;color:var(--text-muted);font-size:10px;text-transform:uppercase;letter-spacing:1.5px;font-weight:700}
+.asst-text{padding:8px 12px;margin:4px 0;color:var(--text-sec);font-size:13px;line-height:1.7;white-space:pre-wrap;border-radius:var(--radius-sm);background:rgba(255,255,255,0.015)}
 
-/* Milestone panel */
-.ms-panel{width:300px;min-width:280px;border-left:1px solid #1e293b;overflow-y:auto;flex-shrink:0;padding:10px;background:#0c1018}
+/* ═══ TOOL BLOCKS ═══ */
+.tool-block{margin:4px 0;border:1px solid rgba(255,255,255,0.04);border-radius:var(--radius-sm);background:rgba(255,255,255,0.015);overflow:hidden}
+.tool-header{padding:6px 10px;display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none}
+.tool-header:hover{background:rgba(255,255,255,0.02)}
+.tool-header .arrow{color:var(--text-dim);font-size:10px;transition:transform .15s;width:14px;flex-shrink:0}
+.tool-header .arrow.open{transform:rotate(90deg)}
+.tool-badge{display:inline-block;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:700;background:rgba(255,255,255,0.04);font-family:var(--mono);flex-shrink:0}
+.tb-bash{color:var(--blue)}.tb-read{color:var(--green)}.tb-edit{color:var(--amber)}.tb-grep{color:var(--purple)}.tb-glob{color:var(--purple)}.tb-write{color:var(--cyan)}.tb-apply_patch{color:#fb923c}.tb-task{color:#a8a29e}.tb-question{color:#f0abfc}
+.tool-title{color:var(--text-sec);font-size:12px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tool-dur{color:var(--text-dim);font-size:10px;font-family:var(--mono);flex-shrink:0}
+.tool-body{display:none;padding:8px 10px;border-top:1px solid rgba(255,255,255,0.04)}.tool-body.open{display:block}
+.codeblock{background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.04);border-radius:6px;padding:10px 12px;overflow-x:auto;white-space:pre-wrap;word-break:break-all;font-size:11px;font-family:var(--mono);line-height:1.6;margin:4px 0;max-height:400px;overflow-y:auto;color:var(--text-sec)}
+.codeblock .cmd{color:var(--text)}.codeblock .out{color:var(--text-muted)}
+.diff{background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.04);border-radius:6px;padding:10px 12px;overflow-x:auto;font-size:11px;font-family:var(--mono);line-height:1.6;margin:4px 0;max-height:400px;overflow-y:auto}
+.diff .del{background:rgba(239,68,68,0.08);color:var(--red);display:block}.diff .add{background:rgba(74,222,128,0.08);color:var(--green);display:block}
+.empty-resp{padding:8px 12px;color:var(--text-dim);font-size:12px;font-style:italic;margin:4px 0}
+
+/* ═══ MILESTONE SIDEBAR (simplified) ═══ */
+.ms-panel{width:280px;min-width:260px;border-left:1px solid var(--glass-border);overflow-y:auto;flex-shrink:0;padding:12px;background:rgba(255,255,255,0.01)}
 .ms-panel.hidden{display:none}
-.ms-panel h3{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#475569;padding:4px 6px;margin-bottom:4px}
-.ms-card{padding:8px 10px;margin-bottom:6px;border-radius:4px;border:1px solid #151c24;background:#101418;cursor:pointer;transition:all .15s}
-.ms-card:hover{border-color:#334155}
-.ms-card.ms-done{border-left:3px solid #4ade80}
-.ms-card.ms-active{border-left:3px solid #fbbf24}
-.ms-card.ms-pending{border-left:3px solid #334155}
-.ms-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
-.ms-id{font-size:11px;font-weight:800;color:#f0f4ff;background:#1e3a5f;padding:2px 8px;border-radius:3px}
-.ms-status{font-size:10px;text-transform:capitalize}
-.ms-status-completed{color:#4ade80}
-.ms-status-pending{color:#475569}
-.ms-prompt-text{color:#94a3b8;font-size:11px;line-height:1.5;margin-bottom:6px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;cursor:pointer}
-.ms-prompt-text.expanded{-webkit-line-clamp:unset}
-.ms-toggle{color:#475569;font-size:10px;cursor:pointer;user-select:none;padding:2px 0}
-.ms-toggle:hover{color:#94a3b8}
-.ms-criteria{color:#64748b;font-size:11px;line-height:1.5;padding:6px 8px;background:#0a0e14;border-radius:3px;margin-top:4px;border:1px solid #151c24}
-.ms-turns{font-size:10px;color:#475569;margin-top:6px;font-family:'SF Mono',Consolas,monospace}
-.ms-task-info{padding:8px 10px;margin-bottom:8px;border-radius:4px;background:#101418;border:1px solid #151c24}
-.ms-task-title{color:#f0f4ff;font-size:12px;font-weight:600;margin-bottom:4px}
-.ms-task-desc{color:#64748b;font-size:11px;line-height:1.4;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;cursor:pointer}
-.ms-task-desc.expanded{-webkit-line-clamp:unset}
+.ms-panel h3{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);padding:4px 6px;margin-bottom:6px;font-weight:700}
+.ms-card{padding:10px 12px;margin-bottom:6px;border-radius:var(--radius-sm);border:1px solid rgba(255,255,255,0.04);background:rgba(255,255,255,0.015);cursor:pointer;transition:all .15s}
+.ms-card:hover{border-color:var(--glass-hover-border);background:var(--glass-hover)}
+.ms-card.ms-done{border-left:3px solid var(--green)}
+.ms-card.ms-active{border-left:3px solid var(--amber)}
+.ms-card.ms-pending{border-left:3px solid var(--text-dim)}
+.ms-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
+.ms-id{font-size:11px;font-weight:800;color:var(--text);background:rgba(139,92,246,0.12);padding:2px 8px;border-radius:4px}
+.ms-status{font-size:10px;text-transform:capitalize;font-weight:600}
+.ms-status-completed{color:var(--green)}.ms-status-in_progress{color:var(--amber)}.ms-status-pending,.ms-status-not_started{color:var(--text-dim)}
+.ms-prompt{color:var(--text-muted);font-size:11px;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin-bottom:4px}
+.ms-meta{font-size:10px;color:var(--text-dim);font-family:var(--mono);display:flex;gap:10px}
+.ms-meta .int-ct{color:var(--purple)}
 
-/* Milestone badges in conversation & nav */
-.ms-badge{display:inline-block;padding:1px 6px;border-radius:3px;font-size:9px;font-weight:800;background:#1e3a5f;color:#60a5fa;margin-left:6px;vertical-align:middle}
-.turn-group.ms-start{border-top:2px solid #1e3a5f}
-.turn-group.ms-start>.turn-header{background:#0c1628}
-.pn-item.ms-start{border-left:3px solid #1e3a5f}
+/* ═══ SCROLLBAR & ANIMATION ═══ */
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.08);border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,0.15)}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.fade-in{animation:fadeIn .4s ease-out}
 </style>
 </head>
 <body>
-<div class="loader" id="loader">
-  <div class="drop-row">
-    <div class="drop-zone" id="dz-traj">
-      <div class="dz-check">&#10003;</div>
-      <h2>Trajectory JSON</h2>
-      <p>opencode_export.json</p>
-    </div>
-    <div class="drop-zone" id="dz-task">
-      <div class="dz-check">&#10003;</div>
-      <h2>Task JSON</h2>
-      <p>task.json</p>
-    </div>
+<div class="bg-orbs"><div class="orb orb-1"></div><div class="orb orb-2"></div><div class="orb orb-3"></div></div>
+
+<div id="loader">
+  <div class="loader-title">Trajectory Viewer</div>
+  <div class="loader-sub">Multi-model trajectory analysis</div>
+  <div class="drop-zone glass" id="drop-zone">
+    <div class="dz-icon">&#128193;</div>
+    <h2>Drop a task folder here</h2>
+    <p>Upload a folder containing <b>vm-*</b> model directories<br>
+    Each should have <b>task.json</b>, <b>trajectories/</b>, and optionally <b>opencode_export.json</b><br><br>
+    Or drop individual JSON files</p>
   </div>
-  <p style="color:#334155;font-size:11px;margin-top:4px">Drop files on each zone, or drop both at once</p>
-  <div class="loader-actions">
-    <button class="launch-btn" id="launch-btn" onclick="launchViewer()">Launch Viewer</button>
-    <span class="skip-link" id="skip-link" style="display:none" onclick="launchViewer()">skip task file &rarr;</span>
-  </div>
-  <input type="file" id="fi-traj" accept=".json">
-  <input type="file" id="fi-task" accept=".json">
-  <input type="file" id="fi-open" accept=".json" style="display:none">
+  <div class="load-status" id="load-status"></div>
+  <button class="launch-btn" id="launch-btn" onclick="launch()">Launch Viewer</button>
+  <input type="file" id="fi-folder" webkitdirectory multiple>
+  <input type="file" id="fi-files" multiple accept=".json,.jsonl">
 </div>
-<div id="app" style="display:none;flex-direction:column;height:100vh">
+
+<div id="app">
   <div class="topbar" id="topbar"></div>
-  <div class="main">
-    <div class="prompt-nav" id="prompt-nav"></div>
-    <div class="convo" id="convo"></div>
-    <div class="ms-panel hidden" id="ms-panel"></div>
-    <div class="rubric-panel hidden" id="rubric-panel"></div>
+  <div id="compare-view"></div>
+  <div id="model-view">
+    <div class="mv-body">
+      <div class="convo" id="convo"></div>
+      <div class="ms-panel hidden" id="ms-panel"></div>
+    </div>
   </div>
-  <div class="statsbar" id="statsbar"></div>
 </div>
+
 <script>
-var LABELS={bash:'bash',read:'read',edit:'edit',grep:'grep',glob:'glob',write:'write',task:'task',todowrite:'todo',apply_patch:'patch',question:'question'};
-var DATA=null,TASK=null,MILESTONES=[],MILESTONE_MAP={},currentTrace=null,sectionEls=[];
-var pendingTraj=null,pendingTask=null;
+/* ═══════════════════════════════════════════════════════════
+   STATE
+   ═══════════════════════════════════════════════════════════ */
+var STATE = {
+  task: null,
+  models: {},
+  modelOrder: [],
+  activeTab: 'compare',
+  allCollapsed: false
+};
+var LABELS = {bash:'Bash',read:'Read',edit:'Edit',grep:'Grep',glob:'Glob',write:'Write',task:'Task',apply_patch:'Patch',question:'Ask',todowrite:'Todo',agent:'Agent'};
 
-function isTaskFile(raw){return!!(raw.user_intent&&raw.user_intent.milestones)||!!raw.milestone_progress}
+/* ═══════════════════════════════════════════════════════════
+   FILE UPLOAD
+   ═══════════════════════════════════════════════════════════ */
+var dz = document.getElementById('drop-zone');
+var fiFolder = document.getElementById('fi-folder');
+var statusEl = document.getElementById('load-status');
+var launchBtn = document.getElementById('launch-btn');
 
-function handleFile(f){
-  var r=new FileReader();
-  r.onload=function(e){
-    try{
-      var raw=JSON.parse(e.target.result);
-      if(isTaskFile(raw)){
-        pendingTask=raw;
-        document.getElementById('dz-task').classList.add('loaded');
-        document.getElementById('dz-task').querySelector('h2').textContent='Task loaded';
-      }else{
-        pendingTraj=raw;
-        document.getElementById('dz-traj').classList.add('loaded');
-        document.getElementById('dz-traj').querySelector('h2').textContent='Trajectory loaded';
-      }
-      updateLoaderState();
-    }catch(err){alert('Invalid JSON: '+err.message)}
-  };
-  r.readAsText(f);
+dz.addEventListener('click', function() { fiFolder.click(); });
+dz.addEventListener('dragover', function(e) { e.preventDefault(); dz.classList.add('over'); });
+dz.addEventListener('dragleave', function() { dz.classList.remove('over'); });
+dz.addEventListener('drop', function(e) {
+  e.preventDefault(); dz.classList.remove('over');
+  var items = e.dataTransfer.items;
+  if (items && items.length && items[0].webkitGetAsEntry) {
+    var entries = [];
+    for (var i = 0; i < items.length; i++) { var en = items[i].webkitGetAsEntry(); if (en) entries.push(en); }
+    readEntries(entries);
+  } else {
+    handleFileList(e.dataTransfer.files);
+  }
+});
+fiFolder.addEventListener('change', function(e) { handleFileList(e.target.files); });
+
+function readEntries(entries) {
+  var allFiles = [], pending = 0;
+  function checkDone() { if (pending === 0) processFiles(allFiles); }
+  function traverse(entry, path) {
+    pending++;
+    if (entry.isFile) {
+      entry.file(function(f) { f._path = path + f.name; allFiles.push(f); pending--; checkDone(); });
+    } else if (entry.isDirectory) {
+      var reader = entry.createReader();
+      (function readBatch() {
+        reader.readEntries(function(results) {
+          if (!results.length) { pending--; checkDone(); return; }
+          for (var i = 0; i < results.length; i++) traverse(results[i], path + entry.name + '/');
+          readBatch();
+        });
+      })();
+    }
+  }
+  entries.forEach(function(e) { traverse(e, ''); });
 }
 
-function handleFiles(files){for(var i=0;i<files.length;i++)handleFile(files[i])}
-
-function updateLoaderState(){
-  var btn=document.getElementById('launch-btn'),skip=document.getElementById('skip-link');
-  if(pendingTraj&&pendingTask){btn.classList.add('ready');skip.style.display='none'}
-  else if(pendingTraj){btn.classList.remove('ready');skip.style.display='inline'}
-  else{btn.classList.remove('ready');skip.style.display='none'}
+function handleFileList(fileList) {
+  var files = Array.from(fileList);
+  files.forEach(function(f) { f._path = f.webkitRelativePath || f.name; });
+  processFiles(files);
 }
 
-function launchViewer(){
-  if(!pendingTraj)return;
-  DATA=normalizeData(pendingTraj);
-  TASK=pendingTask;
-  extractMilestones();
+function processFiles(files) {
+  statusEl.textContent = 'Processing ' + files.length + ' files\u2026';
+  var groups = {}, ungrouped = [];
+  files.forEach(function(f) {
+    var path = f._path || f.name, parts = path.split('/'), modelDir = null;
+    for (var i = 0; i < parts.length; i++) { if (parts[i].match(/^vm-/)) { modelDir = parts[i]; break; } }
+    if (!modelDir) { ungrouped.push(f); return; }
+    if (!groups[modelDir]) groups[modelDir] = [];
+    groups[modelDir].push(f);
+  });
+  if (!Object.keys(groups).length && ungrouped.length) { groups['model_1'] = ungrouped; }
+  var modelKeys = Object.keys(groups);
+  if (!modelKeys.length) { statusEl.textContent = 'No valid files found'; return; }
+
+  var total = modelKeys.length, loaded = 0;
+  modelKeys.forEach(function(mk) {
+    var g = groups[mk];
+    var model = { name: mk, task: null, trajectory: null, opencode: null, milestoneProgressRaw: null };
+    var fileReads = [];
+    g.forEach(function(f) {
+      var fname = f.name || (f._path || '').split('/').pop();
+      var subpath = (f._path || '').toLowerCase();
+      if (fname === 'task.json') fileReads.push(readJSON(f).then(function(d) { model.task = d; }));
+      else if (fname === 'opencode_export.json') fileReads.push(readJSON(f).then(function(d) { model.opencode = d; }));
+      else if (subpath.indexOf('trajectory') !== -1 && fname.endsWith('.json')) fileReads.push(readJSON(f).then(function(d) { model.trajectory = d; }));
+      else if (fname === 'milestone_progress.jsonl') fileReads.push(readText(f).then(function(t) { model.milestoneProgressRaw = t; }));
+    });
+    Promise.all(fileReads).then(function() {
+      STATE.models[mk] = buildModel(mk, model);
+      if (!STATE.task && model.task) STATE.task = model.task;
+      loaded++;
+      statusEl.textContent = 'Loaded ' + loaded + '/' + total + ' models';
+      if (loaded === total) finishLoad();
+    });
+  });
+}
+
+function finishLoad() {
+  STATE.modelOrder = Object.keys(STATE.models).sort();
+  dz.classList.add('loaded');
+  dz.querySelector('h2').textContent = STATE.modelOrder.length + ' model(s) loaded';
+  statusEl.textContent = STATE.modelOrder.map(function(k) { return formatModelName(k); }).join(', ');
+  launchBtn.classList.add('ready');
+}
+function launch() {
+  if (!STATE.modelOrder.length) return;
+  document.getElementById('loader').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
   initApp();
 }
+function readJSON(file) { return new Promise(function(res) { var r = new FileReader(); r.onload = function(e) { try { res(JSON.parse(e.target.result)); } catch(err) { res(null); } }; r.readAsText(file); }); }
+function readText(file) { return new Promise(function(res) { var r = new FileReader(); r.onload = function(e) { res(e.target.result); }; r.readAsText(file); }); }
 
-/* Wire up drop zones */
-var dzTraj=document.getElementById('dz-traj'),dzTask=document.getElementById('dz-task');
-var fiTraj=document.getElementById('fi-traj'),fiTask=document.getElementById('fi-task'),fiOpen=document.getElementById('fi-open');
-
-dzTraj.addEventListener('click',function(){fiTraj.click()});
-dzTask.addEventListener('click',function(){fiTask.click()});
-[dzTraj,dzTask].forEach(function(dz){
-  dz.addEventListener('dragover',function(e){e.preventDefault();dz.classList.add('over')});
-  dz.addEventListener('dragleave',function(){dz.classList.remove('over')});
-  dz.addEventListener('drop',function(e){e.preventDefault();dz.classList.remove('over');handleFiles(e.dataTransfer.files)});
-});
-fiTraj.addEventListener('change',function(e){handleFiles(e.target.files)});
-fiTask.addEventListener('change',function(e){handleFiles(e.target.files)});
-fiOpen.addEventListener('change',function(e){if(e.target.files[0])reloadTraj(e.target.files[0])});
-
-function reloadTraj(f){
-  var r=new FileReader();
-  r.onload=function(e){
-    try{
-      var raw=JSON.parse(e.target.result);
-      if(isTaskFile(raw)){TASK=raw;extractMilestones()}
-      else{DATA=normalizeData(raw)}
-      initApp();
-    }catch(err){alert('Invalid JSON: '+err.message)}
-  };
-  r.readAsText(f);
-}
-function openNewFile(){fiOpen.value='';fiOpen.click()}
-
-/* ── Normalize any JSON shape into our internal format ── */
-function normalizeData(raw){
-  var data={
-    metadata:{},overall_rating:{},rubrics:{},rubrics_rating:{},trajectories:{}
-  };
-
-  // Carry over known top-level QC fields if they exist
-  if(raw.metadata)Object.assign(data.metadata,raw.metadata);
-  if(raw.overall_rating)data.overall_rating=raw.overall_rating;
-  if(raw.rubrics)data.rubrics=raw.rubrics;
-  if(raw.rubrics_rating)data.rubrics_rating=raw.rubrics_rating;
-
-  // Figure out where the trajectory data lives
-  if(raw.trajectories){
-    data.trajectories=raw.trajectories;
-  }else if(Array.isArray(raw)){
-    if(raw.length>0&&raw[0]&&typeof raw[0]==='object'&&Array.isArray(raw[0].messages)){
-      if(raw.length===1){
-        data.trajectories={trace_1:raw[0]};
-        var sess=raw[0];
-        data.metadata.instance_id=data.metadata.instance_id||sess.title||sess.slug||sess.id||'';
-      }else{
-        raw.forEach(function(sess,i){
-          var tk='trace_'+(i+1);
-          data.trajectories[tk]=sess;
-          if(!data.metadata.models)data.metadata.models={};
-          data.metadata.models[tk]=sess.title||sess.slug||sess.id||tk;
-        });
-        if(!data.metadata.instance_id)data.metadata.instance_id=raw[0].title||raw[0].slug||raw[0].id||'';
-      }
-    }else{
-      data.trajectories={trace_1:raw};
-    }
-  }else if(raw.messages||raw.turns){
-    data.trajectories={trace_1:raw};
-  }else if(raw.conversation||raw.trajectory){
-    data.trajectories={trace_1:raw.conversation||raw.trajectory};
-  }else if(raw.trace_1||raw.trace_2||raw.trace_3){
-    ['trace_1','trace_2','trace_3'].forEach(function(k){if(raw[k])data.trajectories[k]=raw[k]});
-  }else if(!raw.metadata){
-    // Unknown shape — try treating the whole object as a single trajectory
-    var skip={'overall_rating':1,'rubrics':1,'rubrics_rating':1};
-    var keys=Object.keys(raw).filter(function(k){return!skip[k]});
-    // If there are a small number of top-level object keys, treat them as separate traces
-    if(keys.length>=1&&keys.length<=5&&keys.every(function(k){return typeof raw[k]==='object'&&raw[k]!==null})){
-      keys.forEach(function(k,i){
-        data.trajectories['trace_'+(i+1)]=raw[k];
-        if(!data.metadata.models)data.metadata.models={};
-        data.metadata.models['trace_'+(i+1)]=k;
-      });
-    }else{
-      data.trajectories={trace_1:raw};
-    }
-  }
-
-  // If we still have nothing, wrap the whole thing
-  if(!Object.keys(data.trajectories).length){
-    data.trajectories={trace_1:raw};
-  }
-
-  var m=data.metadata;
-  m.instance_id=m.instance_id||raw.instance_id||raw.id||raw.name||raw.task_id||(raw.info?(raw.info.title||raw.info.slug||raw.info.id):'')||m.title||m.session_id||'';
-  m.golden_trajectory=m.golden_trajectory||{};
-  m.models=m.models||raw.models||{};
-
-  var traceKeys=Object.keys(data.trajectories);
-  traceKeys.forEach(function(tk){if(!m.models[tk])m.models[tk]=(raw.info?raw.info.slug:'')||raw.task_id||tk});
-  traceKeys.forEach(function(tk){if(data.overall_rating[tk]===undefined)data.overall_rating[tk]=null});
-  return data;
+/* ═══════════════════════════════════════════════════════════
+   DATA MODEL
+   ═══════════════════════════════════════════════════════════ */
+function buildModel(key, raw) {
+  var m = { name: key, task: raw.task, opencode: raw.opencode };
+  m.turns = [];
+  if (raw.trajectory && raw.trajectory.turns) m.turns = raw.trajectory.turns;
+  else if (raw.opencode) m.turns = opencodeToTurns(raw.opencode);
+  m.milestoneProgress = [];
+  if (raw.task && raw.task.milestone_progress && raw.task.milestone_progress.length) m.milestoneProgress = raw.task.milestone_progress;
+  else if (raw.milestoneProgressRaw) m.milestoneProgress = parseMilestoneJSONL(raw.milestoneProgressRaw);
+  m.metrics = computeMetrics(m);
+  return m;
 }
 
-/* ── App bootstrap ── */
-function initApp(){
-  document.getElementById('loader').style.display='none';
-  document.getElementById('app').style.display='flex';
+function opencodeToTurns(oc) {
+  if (!oc || !oc.messages) return [];
+  var turns = [], num = 0;
+  oc.messages.forEach(function(msg) {
+    var role = (msg.info && msg.info.role) || msg.role;
+    if (role !== 'user' && role !== 'assistant') return;
+    num++;
+    var text = '';
+    (msg.parts || []).forEach(function(p) { if (p.type === 'text' && p.text) text += p.text + '\n'; });
+    turns.push({ turn_number: num, role: role, content: text.trim() });
+  });
+  return turns;
+}
 
-  var hasRubrics=Object.keys(DATA.rubrics||{}).length>0;
-  document.getElementById('rubric-panel').classList.toggle('hidden',!hasRubrics);
-  document.getElementById('ms-panel').classList.toggle('hidden',!MILESTONES.length);
+function parseMilestoneJSONL(text) {
+  var lines = text.trim().split('\n'), map = {};
+  lines.forEach(function(line) {
+    try {
+      var rec = JSON.parse(line), id = rec.milestone_id;
+      if (!map[id]) map[id] = { milestone_id: id, status: 'not_started' };
+      if (rec.status === 'in_progress' && !map[id].started_at_turn) { map[id].started_at_turn = rec.turn; map[id].status = 'in_progress'; }
+      if (rec.status === 'completed') { map[id].completed_at_turn = rec.turn; map[id].status = 'completed'; if (map[id].started_at_turn) map[id].turn_count = rec.turn - map[id].started_at_turn; }
+    } catch(e) {}
+  });
+  return Object.values(map);
+}
 
+/* ═══════════════════════════════════════════════════════════
+   METRICS
+   ═══════════════════════════════════════════════════════════ */
+function computeMetrics(model) {
+  var task = model.task || STATE.task;
+  var milestones = task && task.user_intent ? (task.user_intent.milestones || []) : [];
+  var guardrails = task && task.user_intent ? (task.user_intent.guardrails || {}) : {};
+  var maxTurns = guardrails.max_turns || null;
+  var totalTurns = model.turns.length;
+  var userTurns = model.turns.filter(function(t) { return t.role === 'user'; }).length;
+  var asstTurns = model.turns.filter(function(t) { return t.role === 'assistant'; }).length;
+
+  var msTotal = milestones.length, msCompleted = 0, msDetails = [];
+  var mp = model.milestoneProgress || [];
+  milestones.forEach(function(ms) {
+    var prog = null;
+    mp.forEach(function(p) { if (p.milestone_id === ms.milestone_id) prog = p; });
+    var status = prog ? prog.status : 'not_started';
+    if (status === 'completed') msCompleted++;
+    msDetails.push({ id: ms.milestone_id, prompt: ms.prompt || '', criteria: ms.continuation_criteria || '', interactions: ms.planned_interactions_list || [], status: status, turnCount: prog ? prog.turn_count : null, startTurn: prog ? prog.started_at_turn : null, endTurn: prog ? prog.completed_at_turn : null });
+  });
+
+  var userTexts = model.turns.filter(function(t) { return t.role === 'user'; }).map(function(t) { return (t.content || '').toLowerCase(); });
+  var allTexts = model.turns.map(function(t) { return (t.content || '').toLowerCase(); });
+  var intTotal = 0, intMatched = 0, intDetails = [];
+  milestones.forEach(function(ms) {
+    (ms.planned_interactions_list || []).forEach(function(intr) {
+      intTotal++;
+      var matched = matchInteraction(intr, userTexts, allTexts);
+      if (matched) intMatched++;
+      intDetails.push({ trigger: intr.trigger, reaction: intr.reaction, milestone: ms.milestone_id, matched: matched });
+    });
+  });
+
+  var tokens = null;
+  if (model.opencode && model.opencode.messages) {
+    tokens = { input: 0, output: 0, total: 0 };
+    model.opencode.messages.forEach(function(msg) {
+      var tk = (msg.info && msg.info.tokens) || {};
+      tokens.input += tk.input || 0; tokens.output += tk.output || 0; tokens.total += (tk.input || 0) + (tk.output || 0);
+    });
+  }
+
+  return { totalTurns: totalTurns, userTurns: userTurns, asstTurns: asstTurns, maxTurns: maxTurns, exceedsMax: maxTurns && totalTurns > maxTurns, msTotal: msTotal, msCompleted: msCompleted, msDetails: msDetails, intTotal: intTotal, intMatched: intMatched, intDetails: intDetails, tokens: tokens };
+}
+
+function matchInteraction(intr, userTexts, allTexts) {
+  var reaction = (intr.reaction || '').toLowerCase();
+  var quotes = reaction.match(/"([^"]{4,})"/g) || [];
+  for (var q = 0; q < quotes.length; q++) {
+    var phrase = quotes[q].slice(1, -1);
+    for (var i = 0; i < userTexts.length; i++) if (userTexts[i].indexOf(phrase) !== -1) return true;
+    for (var j = 0; j < allTexts.length; j++) if (allTexts[j].indexOf(phrase) !== -1) return true;
+  }
+  var words = reaction.replace(/"[^"]*"/g, '').split(/\s+/).filter(function(w) { return w.length > 4 && 'about after again being could doing every first going their there these those through would should'.indexOf(w) === -1; });
+  if (words.length >= 4) {
+    for (var k = 0; k < userTexts.length; k++) {
+      var hits = 0; words.forEach(function(w) { if (userTexts[k].indexOf(w) !== -1) hits++; });
+      if (hits / words.length >= 0.5) return true;
+    }
+  }
+  return false;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   TOPBAR (task meta + tabs)
+   ═══════════════════════════════════════════════════════════ */
+function initApp() {
   renderTopbar();
-  var first=Object.keys(DATA.trajectories)[0]||'trace_1';
-  switchTrace(first);
+  switchTab(STATE.modelOrder.length > 1 ? 'compare' : STATE.modelOrder[0]);
 }
 
-function rc(r){return r>=4?'r-high':r>=3?'r-mid':'r-low'}
-
-/* ── Top bar: trace tabs + open file ── */
-function renderTopbar(){
-  var m=DATA.metadata||{},o=DATA.overall_rating||{},g=m.golden_trajectory||{},models=m.models||{};
-  var traceKeys=Object.keys(DATA.trajectories||{});
-  if(!traceKeys.length)traceKeys=['trace_1'];
-
-  var tabsHtml='';
-  traceKeys.forEach(function(tk){
-    var label=models[tk]||tk;
-    var rating=o[tk];
-    var ratingHtml=rating!=null?' <span class="t-rating '+rc(rating)+'">'+rating+'/5</span>':'';
-    var goldenHtml=g.source===tk?' <span class="golden-badge">GOLDEN</span>':'';
-    tabsHtml+='<div class="tab" data-trace="'+tk+'" onclick="switchTrace(\''+tk+'\')">'+esc(label)+ratingHtml+goldenHtml+'</div>';
+function renderTopbar() {
+  var task = STATE.task, html = '';
+  if (task) {
+    var g = (task.user_intent && task.user_intent.guardrails) || {};
+    var anyExceeds = STATE.modelOrder.some(function(mk) { return STATE.models[mk].metrics.exceedsMax; });
+    html += '<div class="task-title">';
+    html += '<span class="tt-name">' + esc(task.task_title || '') + '</span>';
+    if (task.language) html += '<span class="tt-badge">' + esc(task.language) + '</span>';
+    if (task.difficulty) html += '<span class="tt-badge">' + esc(task.difficulty) + '</span>';
+    if (g.max_turns) html += '<span class="tt-badge' + (anyExceeds ? ' warn' : '') + '">Max ' + g.max_turns + ' turns</span>';
+    html += '</div>';
+  }
+  html += '<div class="tabs">';
+  if (STATE.modelOrder.length > 1) html += '<div class="tab compare-tab' + (STATE.activeTab === 'compare' ? ' active' : '') + '" onclick="switchTab(\'compare\')">Compare</div>';
+  STATE.modelOrder.forEach(function(mk) {
+    var m = STATE.models[mk].metrics;
+    html += '<div class="tab' + (STATE.activeTab === mk ? ' active' : '') + '" data-model="' + mk + '" onclick="switchTab(\'' + mk + '\')">';
+    html += '<span class="t-status ' + (m.exceedsMax ? 't-warn' : 't-ok') + '"></span>' + esc(formatModelName(mk)) + '</div>';
   });
-
-  var titleHtml='';
-  if(m.instance_id)titleHtml='<span style="color:#64748b;font-size:11px;align-self:center;margin-right:8px">'+esc(m.instance_id)+'</span>';
-
-  document.getElementById('topbar').innerHTML=
-    titleHtml+
-    '<div class="tabs">'+tabsHtml+'</div>'+
-    '<div class="actions"><button class="new-btn" id="collapse-btn" onclick="toggleAllTurns()">Collapse all</button><button class="new-btn" onclick="openNewFile()">Open file</button></div>';
+  html += '</div>';
+  html += '<div class="actions"><button class="act-btn" id="collapse-btn" onclick="toggleAllTurns()">Collapse all</button></div>';
+  document.getElementById('topbar').innerHTML = html;
 }
 
-/* ── Switch active trace ── */
-function switchTrace(tk){
-  currentTrace=tk;
-  allCollapsed=false;
-  var btn=document.getElementById('collapse-btn');
-  if(btn)btn.textContent='Collapse all';
-  document.querySelectorAll('.tab').forEach(function(t){t.classList.toggle('active',t.dataset.trace===tk)});
-  renderConversation(DATA.trajectories[tk]);
-  renderPromptNav(DATA.trajectories[tk]);
-  if(Object.keys(DATA.rubrics||{}).length)renderRubricPanel();
-  if(MILESTONES.length)renderMilestonePanel();
-  renderStats(DATA.trajectories[tk]);
-}
-
-/* ── Render the conversation: user prompts + assistant responses ── */
-function renderConversation(traj){
-  sectionEls=[];
-  var el=document.getElementById('convo');
-  if(!traj){el.innerHTML='<div style="padding:40px;color:#475569;text-align:center">No trajectory data for this trace</div>';return}
-
-  var msgs=extractMessages(traj);
-
-  var turns=[],cur=null;
-  msgs.forEach(function(msg){
-    if(msg._role==='user'){
-      if(cur)turns.push(cur);
-      cur={user:msg,assistants:[]};
-    }else if(msg._role==='assistant'){
-      if(!cur)cur={user:null,assistants:[]};
-      cur.assistants.push(msg);
-    }
+function switchTab(tabId) {
+  STATE.activeTab = tabId; STATE.allCollapsed = false;
+  var btn = document.getElementById('collapse-btn'); if (btn) btn.textContent = 'Collapse all';
+  document.querySelectorAll('.tab').forEach(function(t) {
+    if (tabId === 'compare') t.classList.toggle('active', t.classList.contains('compare-tab'));
+    else t.classList.toggle('active', t.dataset && t.dataset.model === tabId);
   });
-  if(cur)turns.push(cur);
-
-  var html='',stepNum=0;
-  turns.forEach(function(turn,idx){
-    var userText='';
-    if(turn.user){
-      var uparts=turn.user._parts||[];
-      userText=uparts.filter(function(p){return p.type==='text'}).map(function(p){return p.text}).join('\n').trim();
-    }
-    var preview=userText?userText.slice(0,100):'(no user prompt)';
-    var msStart=MILESTONE_MAP[idx];
-    var msAny=getMilestoneForPrompt(idx);
-    var msBadge=msStart?'<span class="ms-badge">'+msStart.id.toUpperCase()+'</span>':'';
-    var msClass=msStart?' ms-start':'';
-
-    html+='<div class="turn-group'+msClass+'" id="prompt-'+idx+'" data-prompt="'+idx+'">';
-    html+='<div class="turn-header" onclick="toggleTurn('+idx+')">';
-    html+='<span class="arrow open" id="tarr_'+idx+'">&#9654;</span>';
-    html+='<span class="turn-num">Prompt '+(idx+1)+'</span>'+msBadge;
-    html+='<span class="turn-preview">'+esc(preview)+'</span>';
-    html+='</div>';
-    html+='<div class="turn-body open" id="tbody_'+idx+'">';
-
-    if(turn.user){
-      html+='<div class="msg-user"><div class="msg-user-label">User</div><div class="msg-user-text">'+esc(userText||'(no content)')+'</div></div>';
-    }
-
-    turn.assistants.forEach(function(msg){
-      var aparts=msg._parts||[];
-      html+='<div class="msg-asst">';
-      var hasContent=false;
-      aparts.forEach(function(p){
-        if(p.type==='step-start'){stepNum++;html+='<div class="step-header">Step '+stepNum+'</div>'}
-        else if(p.type==='step-finish'){}
-        else if(p.type==='text'&&p.text&&p.text.trim()){hasContent=true;html+='<div class="asst-text">'+esc(p.text.trim())+'</div>'}
-        else if(p.type==='tool'){hasContent=true;html+=renderToolBlock(p)}
-      });
-      if(!hasContent)html+='<div class="empty-resp">(no visible response content)</div>';
-      html+='</div>';
-    });
-
-    html+='</div></div>';
-  });
-
-  if(!html)html='<div style="padding:40px;color:#475569;text-align:center">No messages found in this trajectory</div>';
-  el.innerHTML=html;
-  sectionEls=[];el.querySelectorAll('.turn-group').forEach(function(s){sectionEls.push(s)});
-  el.removeEventListener('scroll',onScroll);el.addEventListener('scroll',onScroll);
+  var cv = document.getElementById('compare-view'), mv = document.getElementById('model-view');
+  if (tabId === 'compare') { cv.style.display = 'block'; mv.style.display = 'none'; renderCompareView(); }
+  else { cv.style.display = 'none'; mv.style.display = 'flex'; renderModelView(tabId); }
 }
 
-/* ── Render a single tool call block ── */
-function renderToolBlock(p){
-  var tn=p.tool||'tool',state=p.state||{},input=state.input||{},output=state.output||'',meta=state.metadata||{},time=state.time||{};
-  var dur=time.start&&time.end?((time.end-time.start)/1000).toFixed(1)+'s':'';
-  var title=state.title||toolLabel(p);
-  var id='t_'+Math.random().toString(36).slice(2,8);
+/* ═══════════════════════════════════════════════════════════
+   COMPARE VIEW (cards + unified table)
+   ═══════════════════════════════════════════════════════════ */
+function renderCompareView() {
+  var el = document.getElementById('compare-view');
+  var task = STATE.task, html = '<div class="fade-in">';
 
-  var html='<div class="tool-block"><div class="tool-header" onclick="toggleTool(\''+id+'\')">';
-  html+='<span class="arrow" id="arr_'+id+'">&#9654;</span>';
-  html+='<span class="tool-badge tb-'+tn+'">'+(LABELS[tn]||tn)+'</span>';
-  html+='<span class="tool-title">'+esc(title)+'</span>';
-  if(dur)html+='<span class="tool-dur">'+dur+'</span>';
-  html+='</div>';
-  html+='<div class="tool-body" id="'+id+'">';
-
-  if(tn==='edit'||tn==='apply_patch'){
-    var old=input.oldString||input.old_string||'',nw=input.newString||input.new_string||'',file=input.filePath||input.file_path||input.path||'';
-    if(file)html+='<div style="color:#475569;font-size:11px;margin-bottom:4px;font-family:SF Mono,Consolas,monospace">'+esc(file)+'</div>';
-    if(old||nw){
-      html+='<div class="diff">';
-      if(old)old.split('\n').forEach(function(l){html+='<span class="del">- '+esc(l)+'</span>'});
-      if(nw)nw.split('\n').forEach(function(l){html+='<span class="add">+ '+esc(l)+'</span>'});
-      html+='</div>';
-    }else if(output){
-      html+='<div class="codeblock">'+esc(trunc(output,3000))+'</div>';
-    }
-  }else if(tn==='bash'){
-    var cmd=input.command||input.description||'';
-    if(cmd)html+='<div class="codeblock"><span class="cmd">$ '+esc(cmd)+'</span></div>';
-    if(output)html+='<div class="codeblock"><span class="out">'+esc(trunc(output,3000))+'</span></div>';
-    if(meta.exit!==undefined)html+='<div style="color:'+(meta.exit===0?'#4ade80':'#f87171')+';font-size:11px;margin-top:3px">exit '+meta.exit+'</div>';
-  }else if(tn==='read'){
-    var fp=input.filePath||input.file_path||input.path||'';
-    if(fp)html+='<div style="color:#475569;font-size:11px;margin-bottom:4px;font-family:SF Mono,Consolas,monospace">'+esc(fp)+'</div>';
-    if(output)html+='<div class="codeblock">'+esc(trunc(output,3000))+'</div>';
-  }else if(tn==='grep'){
-    html+='<div style="color:#475569;font-size:11px;margin-bottom:4px">pattern: <b style="color:#c084fc">'+esc(input.pattern||'')+'</b></div>';
-    if(output)html+='<div class="codeblock">'+esc(trunc(output,2000))+'</div>';
-  }else if(tn==='todowrite'){
-    var todos=input.todos||meta.todos||[];
-    todos.forEach(function(t){
-      var ic=t.status==='completed'?'<span style="color:#4ade80">&#10003;</span>':t.status==='in_progress'?'<span style="color:#fbbf24">&#9654;</span>':'<span style="color:#475569">&#9675;</span>';
-      html+='<div style="padding:2px 0">'+ic+' '+esc(t.content)+'</div>';
-    });
-    if(!todos.length&&output)html+='<div class="codeblock">'+esc(trunc(output,2000))+'</div>';
-  }else if(tn==='question'){
-    var questions=input.questions||[];
-    questions.forEach(function(q){
-      html+='<div style="margin-bottom:8px"><div style="color:#94a3b8;font-size:12px;font-weight:600;margin-bottom:4px">'+esc(q.header||q.question||'')+'</div>';
-      if(q.question&&q.header)html+='<div style="color:#c8d0e0;font-size:12px;margin-bottom:4px">'+esc(q.question)+'</div>';
-      if(q.options)q.options.forEach(function(o){
-        html+='<div style="padding:4px 8px;margin:2px 0;background:#141820;border-radius:3px;font-size:11px"><span style="color:#60a5fa">'+esc(o.label||'')+'</span>';
-        if(o.description)html+=' <span style="color:#475569">&mdash; '+esc(o.description)+'</span>';
-        html+='</div>';
-      });
-      html+='</div>';
-    });
-    if(!questions.length&&output)html+='<div class="codeblock">'+esc(trunc(output,2000))+'</div>';
-  }else{
-    var inputStr=JSON.stringify(input,null,2);
-    if(inputStr&&inputStr!=='{}')html+='<div class="codeblock">'+esc(inputStr)+'</div>';
-    if(output)html+='<div class="codeblock">'+esc(trunc(output,2000))+'</div>';
+  // Collapsible problem statement
+  if (task && task.problem_statement) {
+    html += '<details class="cv-problem-wrap glass"><summary>Problem Statement</summary>';
+    html += '<div class="cv-problem-text">' + esc(task.problem_statement) + '</div></details>';
   }
 
-  html+='</div></div>';
+  // Metric cards
+  html += '<div class="metric-grid">';
+  STATE.modelOrder.forEach(function(mk) { html += renderMetricCard(mk); });
+  html += '</div>';
+
+  // Milestone completion table
+  var msKeys = getMilestoneIds();
+  if (msKeys.length) {
+    html += '<div class="cv-table-wrap glass">';
+    html += '<h3>Milestones</h3>';
+    html += '<table class="cv-table"><thead><tr><th style="width:70px"></th>';
+    STATE.modelOrder.forEach(function(mk) { html += '<th>' + esc(formatModelName(mk)) + '</th>'; });
+    html += '</tr></thead><tbody>';
+    msKeys.forEach(function(msId) {
+      html += '<tr><td>' + esc(msId.toUpperCase()) + '</td>';
+      STATE.modelOrder.forEach(function(mk) {
+        var detail = findMsDetail(mk, msId);
+        var cell = '';
+        if (detail && detail.status === 'completed') cell = '<span class="cell-pass">&#10003;</span><span class="cell-turns">' + (detail.turnCount != null ? detail.turnCount + ' turns' : '') + '</span>';
+        else if (detail && detail.status === 'in_progress') cell = '<span class="cell-wip">in progress</span>';
+        else cell = '<span class="cell-fail">&#10007;</span>';
+        html += '<td>' + cell + '</td>';
+      });
+      html += '</tr>';
+    });
+    html += '</tbody></table></div>';
+  }
+
+  html += '</div>';
+  el.innerHTML = html;
+}
+
+function renderMetricCard(mk) {
+  var m = STATE.models[mk].metrics;
+  var colors = ['#6366f1','#3b82f6','#06b6d4','#8b5cf6','#ec4899'];
+  var dotColor = colors[STATE.modelOrder.indexOf(mk) % colors.length];
+  var msPct = m.msTotal ? Math.round(m.msCompleted / m.msTotal * 100) : 0;
+  var turnPct = m.maxTurns ? Math.min(Math.round(m.totalTurns / m.maxTurns * 100), 100) : 0;
+
+  var html = '<div class="metric-card glass" onclick="switchTab(\'' + mk + '\')">';
+  html += '<div class="mc-name"><span class="mc-dot" style="background:' + dotColor + '"></span>' + esc(formatModelName(mk)) + '</div>';
+
+  if (m.msTotal) {
+    html += '<div class="mc-row"><span class="mc-label">Milestones</span><span class="mc-value" style="color:var(--green)">' + m.msCompleted + ' / ' + m.msTotal + '</span></div>';
+    html += '<div class="progress-track"><div class="progress-fill pf-green" style="width:' + msPct + '%"></div></div>';
+  }
+
+  html += '<div class="mc-row"><span class="mc-label">Turns</span><span class="mc-value' + (m.exceedsMax ? '" style="color:var(--red)' : '') + '">' + m.totalTurns + (m.maxTurns ? ' / ' + m.maxTurns : '') + '</span></div>';
+  if (m.maxTurns) html += '<div class="progress-track"><div class="progress-fill ' + (m.exceedsMax ? 'pf-red' : 'pf-blue') + '" style="width:' + turnPct + '%"></div></div>';
+
+  html += '</div>';
   return html;
 }
 
-function toggleTool(id){
-  var b=document.getElementById(id),a=document.getElementById('arr_'+id);
-  if(b){b.classList.toggle('open');if(a)a.classList.toggle('open')}
+/* ═══════════════════════════════════════════════════════════
+   MODEL VIEW
+   ═══════════════════════════════════════════════════════════ */
+function renderModelView(mk) {
+  var model = STATE.models[mk];
+  if (!model) return;
+  renderConversation(model);
+  renderMilestonePanel(model);
 }
 
-function toggleTurn(idx){
-  var b=document.getElementById('tbody_'+idx),a=document.getElementById('tarr_'+idx);
-  if(b){b.classList.toggle('open');if(a)a.classList.toggle('open')}
+function renderConversation(model) {
+  var el = document.getElementById('convo');
+  if (model.opencode && model.opencode.messages) renderConvoOpencode(el, model);
+  else renderConvoSimple(el, model);
 }
 
-var allCollapsed=false;
-function toggleAllTurns(){
-  allCollapsed=!allCollapsed;
-  document.querySelectorAll('.turn-body').forEach(function(b){b.classList.toggle('open',!allCollapsed)});
-  document.querySelectorAll('.turn-header .arrow').forEach(function(a){a.classList.toggle('open',!allCollapsed)});
-  var btn=document.getElementById('collapse-btn');
-  if(btn)btn.textContent=allCollapsed?'Expand all':'Collapse all';
-}
-
-/* ── Prompt navigation panel (left sidebar) ── */
-function renderPromptNav(traj){
-  var el=document.getElementById('prompt-nav');
-  if(!traj){el.innerHTML='';return}
-  var msgs=extractMessages(traj);
-  var prompts=[];
-  msgs.forEach(function(msg){
-    if(msg._role==='user'){
-      var text=(msg._parts||[]).filter(function(p){return p.type==='text'}).map(function(p){return p.text}).join('\n').trim();
-      prompts.push(text||'(no content)');
-    }
+function renderConvoSimple(el, model) {
+  var turns = model.turns, msMap = buildMsMap(model);
+  if (!turns.length) { el.innerHTML = '<div style="padding:40px;color:var(--text-dim);text-align:center">No trajectory data</div>'; return; }
+  var groups = [], cur = null;
+  turns.forEach(function(t) {
+    if (t.role === 'user') { if (cur) groups.push(cur); cur = { user: t, assistants: [], turnNum: t.turn_number }; }
+    else if (t.role === 'assistant') { if (!cur) cur = { user: null, assistants: [], turnNum: t.turn_number }; cur.assistants.push(t); }
   });
-  if(!prompts.length&&msgs.length){prompts.push('(full trajectory)')}
-  var html='<h3>Prompts ('+prompts.length+')</h3>';
-  prompts.forEach(function(text,i){
-    var msStart=MILESTONE_MAP[i];
-    var msClass=msStart?' ms-start':'';
-    var msBadge=msStart?' <span class="ms-badge">'+msStart.id.toUpperCase()+'</span>':'';
-    html+='<div class="pn-item'+(i===0?' active':'')+msClass+'" data-prompt="'+i+'" onclick="jumpToPrompt('+i+')">';
-    html+='<span class="pn-num">Prompt '+(i+1)+msBadge+'</span>';
-    html+='<span class="pn-text">'+esc(text)+'</span>';
-    html+='</div>';
+  if (cur) groups.push(cur);
+  var html = '';
+  groups.forEach(function(g, idx) {
+    var userText = g.user ? (g.user.content || '(no content)') : '(no user prompt)';
+    var msId = msMap[g.turnNum];
+    html += '<div class="turn-group' + (msId ? ' ms-start' : '') + '" id="prompt-' + idx + '">';
+    html += '<div class="turn-header" onclick="toggleTurn(' + idx + ')">';
+    html += '<span class="arrow open" id="tarr_' + idx + '">&#9654;</span>';
+    html += '<span class="turn-num">Prompt ' + (idx + 1) + '</span>';
+    if (msId) html += '<span class="ms-badge">' + msId.toUpperCase() + '</span>';
+    html += '<span class="turn-preview">' + esc(userText.slice(0, 120)) + '</span></div>';
+    html += '<div class="turn-body open" id="tbody_' + idx + '">';
+    if (g.user) html += '<div class="msg-user"><div class="msg-user-label">User</div><div class="msg-user-text">' + esc(userText) + '</div></div>';
+    g.assistants.forEach(function(a) { html += '<div class="msg-asst"><div class="asst-text">' + esc(a.content || '(no response)') + '</div></div>'; });
+    html += '</div></div>';
   });
-  el.innerHTML=html;
+  el.innerHTML = html;
 }
 
-/* ── Rubric sidebar (only rendered when data exists) ── */
-function renderRubricPanel(){
-  var rubrics=DATA.rubrics||{},rr=DATA.rubrics_rating||{},keys=Object.keys(rubrics);
-  var html='<h3>Rubrics ('+keys.length+')</h3>';
-  keys.forEach(function(k,i){
-    var r=rubrics[k]||{},tc='rt-'+(r.type||'').replace(/\s/g,'_');
-    var v=rr[currentTrace]?rr[currentTrace][k]:'?';
-    var gradeClass=v==='PASS'?'rc-pass':v==='FAIL'?'rc-fail':'';
-    html+='<div class="rc" data-rubric="'+i+'" onclick="scrollToRubric('+i+')">'+
-      '<div class="rc-head"><span class="rc-num">R'+(i+1)+'</span><span class="rc-type '+tc+'">'+(r.type||'')+'</span></div>'+
-      '<div class="rc-text">'+esc(r.criterion||'')+'</div>'+
-      '<span class="rc-grade '+gradeClass+'">'+v+'</span>'+
-      '<span class="rc-imp">'+(r.importance==='MUST_FOLLOW'?'MUST':'GOOD')+'</span>'+
-    '</div>';
+function renderConvoOpencode(el, model) {
+  var msgs = model.opencode.messages;
+  if (!msgs || !msgs.length) { el.innerHTML = '<div style="padding:40px;color:var(--text-dim);text-align:center">No messages</div>'; return; }
+  var normalized = [];
+  msgs.forEach(function(m) {
+    var role = (m.info && m.info.role) || m.role;
+    if (role === 'user' || role === 'assistant') normalized.push({ role: role, parts: m.parts || [], raw: m });
   });
-  var o=DATA.overall_rating||{};
-  var traceNum=currentTrace?currentTrace.replace('trace_',''):'1';
-  var rating=o[currentTrace];
-  html+='<div class="rc-section">Overall Rating</div>';
-  html+='<div class="rc" style="cursor:default"><div class="rc-head"><span class="rc-num" style="font-size:14px;color:#f0f4ff">'+(rating!=null?rating+'/5':'N/A')+'</span></div><div class="rc-text expanded" style="color:#94a3b8">'+esc(o['rationale_'+traceNum]||'')+'</div></div>';
-  document.getElementById('rubric-panel').innerHTML=html;
+  var groups = [], cur = null, pidx = 0;
+  normalized.forEach(function(m) {
+    if (m.role === 'user') { if (cur) { cur.pidx = pidx++; groups.push(cur); } cur = { user: m, assistants: [] }; }
+    else { if (!cur) cur = { user: null, assistants: [] }; cur.assistants.push(m); }
+  });
+  if (cur) { cur.pidx = pidx; groups.push(cur); }
+
+  var msMap = buildMsMap(model), html = '', stepNum = 0;
+  groups.forEach(function(g, idx) {
+    var userText = '';
+    if (g.user) (g.user.parts || []).forEach(function(p) { if (p.type === 'text' && p.text) userText += p.text + '\n'; });
+    userText = userText.trim();
+    var turnNum = idx * 2 + 1, msId = null;
+    Object.keys(msMap).forEach(function(k) { if (Math.abs(parseInt(k) - turnNum) <= 1) msId = msMap[k]; });
+
+    html += '<div class="turn-group' + (msId ? ' ms-start' : '') + '" id="prompt-' + idx + '">';
+    html += '<div class="turn-header" onclick="toggleTurn(' + idx + ')">';
+    html += '<span class="arrow open" id="tarr_' + idx + '">&#9654;</span>';
+    html += '<span class="turn-num">Prompt ' + (idx + 1) + '</span>';
+    if (msId) html += '<span class="ms-badge">' + msId.toUpperCase() + '</span>';
+    html += '<span class="turn-preview">' + esc((userText || '(no user prompt)').slice(0, 120)) + '</span></div>';
+    html += '<div class="turn-body open" id="tbody_' + idx + '">';
+    if (g.user && userText) html += '<div class="msg-user"><div class="msg-user-label">User</div><div class="msg-user-text">' + esc(userText) + '</div></div>';
+
+    g.assistants.forEach(function(msg) {
+      html += '<div class="msg-asst">';
+      var hasContent = false;
+      (msg.parts || []).forEach(function(p) {
+        if (p.type === 'step-start') { stepNum++; html += '<div class="step-header">Step ' + stepNum + '</div>'; }
+        else if (p.type === 'text' && p.text && p.text.trim()) { hasContent = true; html += '<div class="asst-text">' + esc(p.text.trim()) + '</div>'; }
+        else if (p.type === 'tool') { hasContent = true; html += renderToolBlock(p); }
+      });
+      if (!hasContent) html += '<div class="empty-resp">(no visible content)</div>';
+      html += '</div>';
+    });
+    html += '</div></div>';
+  });
+  el.innerHTML = html;
 }
 
-/* ── Milestone extraction and mapping ── */
-function extractMilestones(){
-  MILESTONES=[];MILESTONE_MAP={};
-  if(!TASK)return;
-  var ms=(TASK.user_intent&&TASK.user_intent.milestones)||TASK.milestones||[];
-  var progress=TASK.milestone_progress||[];
-  MILESTONES=ms.map(function(m,i){
-    var p=null;
-    progress.forEach(function(pr){if(pr.milestone_id===m.milestone_id)p=pr});
-    return{
-      id:m.milestone_id,num:i+1,
-      prompt:m.prompt||'',
-      criteria:m.continuation_criteria||'',
-      interactions:m.planned_interactions_list||[],
-      status:p?p.status:'pending',
-      startTurn:p?p.started_at_turn:null,
-      endTurn:p?p.completed_at_turn:null,
-      turnCount:p?p.turn_count:null
-    };
-  });
-  MILESTONES.forEach(function(ms){
-    if(ms.startTurn)MILESTONE_MAP[ms.startTurn-1]=ms;
-  });
-}
+/* ═══════════════════════════════════════════════════════════
+   TOOL BLOCKS
+   ═══════════════════════════════════════════════════════════ */
+function renderToolBlock(p) {
+  var tn = p.tool || 'tool', st = p.state || {}, inp = st.input || {}, out = st.output || '', meta = st.metadata || {}, time = st.time || {};
+  var dur = time.start && time.end ? ((time.end - time.start) / 1000).toFixed(1) + 's' : '';
+  var title = st.title || toolLabel(tn, inp);
+  var id = 't_' + Math.random().toString(36).slice(2, 8);
+  var html = '<div class="tool-block"><div class="tool-header" onclick="toggleTool(\'' + id + '\')">';
+  html += '<span class="arrow" id="arr_' + id + '">&#9654;</span>';
+  html += '<span class="tool-badge tb-' + tn + '">' + (LABELS[tn] || tn) + '</span>';
+  html += '<span class="tool-title">' + esc(title) + '</span>';
+  if (dur) html += '<span class="tool-dur">' + dur + '</span>';
+  html += '</div><div class="tool-body" id="' + id + '">';
 
-function getMilestoneForPrompt(idx){
-  if(MILESTONE_MAP[idx])return MILESTONE_MAP[idx];
-  for(var i=0;i<MILESTONES.length;i++){
-    var ms=MILESTONES[i];
-    if(ms.startTurn&&ms.endTurn&&idx>=(ms.startTurn-1)&&idx<=(ms.endTurn-1))return ms;
+  if (tn === 'edit' || tn === 'apply_patch') {
+    var old = inp.oldString || inp.old_string || '', nw = inp.newString || inp.new_string || '', file = inp.filePath || inp.file_path || inp.path || '';
+    if (file) html += '<div style="color:var(--text-muted);font-size:11px;margin-bottom:6px;font-family:var(--mono)">' + esc(file) + '</div>';
+    if (old || nw) {
+      html += '<div class="diff">';
+      if (old) old.split('\n').forEach(function(l) { html += '<span class="del">- ' + esc(l) + '</span>'; });
+      if (nw) nw.split('\n').forEach(function(l) { html += '<span class="add">+ ' + esc(l) + '</span>'; });
+      html += '</div>';
+    } else if (out) html += '<div class="codeblock">' + esc(trunc(out, 3000)) + '</div>';
+  } else if (tn === 'bash') {
+    var cmd = inp.command || inp.description || '';
+    if (cmd) html += '<div class="codeblock"><span class="cmd">$ ' + esc(cmd) + '</span></div>';
+    if (out) html += '<div class="codeblock"><span class="out">' + esc(trunc(out, 3000)) + '</span></div>';
+    if (meta.exit !== undefined) html += '<div style="color:' + (meta.exit === 0 ? 'var(--green)' : 'var(--red)') + ';font-size:11px;margin-top:4px">exit ' + meta.exit + '</div>';
+  } else if (tn === 'read') {
+    var fp = inp.filePath || inp.file_path || inp.path || '';
+    if (fp) html += '<div style="color:var(--text-muted);font-size:11px;margin-bottom:4px;font-family:var(--mono)">' + esc(fp) + '</div>';
+    if (out) html += '<div class="codeblock">' + esc(trunc(out, 3000)) + '</div>';
+  } else if (tn === 'grep') {
+    html += '<div style="color:var(--text-muted);font-size:11px;margin-bottom:4px">pattern: <b style="color:var(--purple)">' + esc(inp.pattern || '') + '</b></div>';
+    if (out) html += '<div class="codeblock">' + esc(trunc(out, 2000)) + '</div>';
+  } else {
+    var is = JSON.stringify(inp, null, 2);
+    if (is && is !== '{}') html += '<div class="codeblock">' + esc(is) + '</div>';
+    if (out) html += '<div class="codeblock">' + esc(trunc(out, 2000)) + '</div>';
   }
+  html += '</div></div>';
+  return html;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   MILESTONE SIDEBAR (simplified)
+   ═══════════════════════════════════════════════════════════ */
+function renderMilestonePanel(model) {
+  var el = document.getElementById('ms-panel'), m = model.metrics;
+  if (!m.msDetails.length) { el.classList.add('hidden'); return; }
+  el.classList.remove('hidden');
+  var html = '<h3>Milestones (' + m.msCompleted + '/' + m.msTotal + ')</h3>';
+  m.msDetails.forEach(function(ms) {
+    var sc = ms.status === 'completed' ? 'ms-done' : ms.status === 'in_progress' ? 'ms-active' : 'ms-pending';
+    var promptIdx = ms.startTurn ? Math.floor((ms.startTurn - 1) / 2) : 0;
+    html += '<div class="ms-card ' + sc + '" onclick="jumpToPrompt(' + promptIdx + ')">';
+    html += '<div class="ms-head"><span class="ms-id">' + ms.id.toUpperCase() + '</span>';
+    html += '<span class="ms-status ms-status-' + ms.status + '">' + ms.status.replace('_', ' ') + '</span></div>';
+    html += '<div class="ms-prompt">' + esc(ms.prompt) + '</div>';
+    html += '<div class="ms-meta">';
+    if (ms.startTurn) html += '<span>' + ms.startTurn + '&ndash;' + (ms.endTurn || '?') + '</span>';
+    if (ms.turnCount != null) html += '<span>' + ms.turnCount + 't</span>';
+    var ints = getIntsForMs(model.name, ms.id);
+    if (ints.total) html += '<span class="int-ct">' + ints.matched + '/' + ints.total + ' int</span>';
+    html += '</div></div>';
+  });
+  el.innerHTML = html;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   UI HELPERS
+   ═══════════════════════════════════════════════════════════ */
+function toggleTurn(idx) {
+  var b = document.getElementById('tbody_' + idx), a = document.getElementById('tarr_' + idx);
+  if (b) { b.classList.toggle('open'); if (a) a.classList.toggle('open'); }
+}
+function toggleTool(id) {
+  var b = document.getElementById(id), a = document.getElementById('arr_' + id);
+  if (b) { b.classList.toggle('open'); if (a) a.classList.toggle('open'); }
+}
+function toggleAllTurns() {
+  STATE.allCollapsed = !STATE.allCollapsed;
+  document.querySelectorAll('.turn-body').forEach(function(b) { b.classList.toggle('open', !STATE.allCollapsed); });
+  document.querySelectorAll('.turn-header .arrow').forEach(function(a) { a.classList.toggle('open', !STATE.allCollapsed); });
+  var btn = document.getElementById('collapse-btn');
+  if (btn) btn.textContent = STATE.allCollapsed ? 'Expand all' : 'Collapse all';
+}
+function jumpToPrompt(idx) {
+  var target = document.getElementById('prompt-' + idx);
+  if (!target) return;
+  var body = document.getElementById('tbody_' + idx), arr = document.getElementById('tarr_' + idx);
+  if (body && !body.classList.contains('open')) { body.classList.add('open'); if (arr) arr.classList.add('open'); }
+  target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+/* ═══════════════════════════════════════════════════════════
+   DATA HELPERS
+   ═══════════════════════════════════════════════════════════ */
+function buildMsMap(model) {
+  var map = {};
+  (model.metrics.msDetails || []).forEach(function(ms) { if (ms.startTurn) map[ms.startTurn] = ms.id; });
+  return map;
+}
+function getMilestoneIds() {
+  var ids = [];
+  STATE.modelOrder.forEach(function(mk) {
+    STATE.models[mk].metrics.msDetails.forEach(function(ms) { if (ids.indexOf(ms.id) === -1) ids.push(ms.id); });
+  });
+  return ids.sort();
+}
+function findMsDetail(mk, msId) {
+  var ds = STATE.models[mk].metrics.msDetails;
+  for (var i = 0; i < ds.length; i++) if (ds[i].id === msId) return ds[i];
   return null;
 }
-
-/* ── Milestone panel (right sidebar) ── */
-function renderMilestonePanel(){
-  var el=document.getElementById('ms-panel');
-  var html='';
-
-  if(TASK){
-    html+='<div class="ms-task-info">';
-    html+='<div class="ms-task-title">'+esc(TASK.task_title||TASK.problem_statement&&TASK.problem_statement.slice(0,60)||'')+'</div>';
-    if(TASK.problem_statement)html+='<div class="ms-task-desc" onclick="this.classList.toggle(\'expanded\')">'+esc(TASK.problem_statement)+'</div>';
-    html+='</div>';
-  }
-
-  html+='<h3>Milestones ('+MILESTONES.length+')</h3>';
-  MILESTONES.forEach(function(ms,i){
-    var sc=ms.status==='completed'?'ms-done':'ms-pending';
-    var promptIdx=ms.startTurn?ms.startTurn-1:i;
-    html+='<div class="ms-card '+sc+'" onclick="jumpToPrompt('+promptIdx+')">';
-    html+='<div class="ms-head">';
-    html+='<span class="ms-id">'+ms.id.toUpperCase()+'</span>';
-    html+='<span class="ms-status ms-status-'+ms.status+'">'+ms.status+'</span>';
-    html+='</div>';
-
-    var pid='msp_'+i;
-    html+='<div class="ms-prompt-text" id="'+pid+'" onclick="event.stopPropagation();this.classList.toggle(\'expanded\')">'+esc(ms.prompt)+'</div>';
-
-    var cid='msc_'+i;
-    html+='<div class="ms-toggle" onclick="event.stopPropagation();toggleMsDetail(\''+cid+'\',this)">&#9654; Continuation criteria</div>';
-    html+='<div id="'+cid+'" style="display:none"><div class="ms-criteria">'+esc(ms.criteria)+'</div></div>';
-
-    if(ms.startTurn)html+='<div class="ms-turns">Turns '+ms.startTurn+'&ndash;'+ms.endTurn+(ms.turnCount!=null?' ('+ms.turnCount+' exchanges)':'')+'</div>';
-    html+='</div>';
-  });
-  el.innerHTML=html;
+function getIntsForMs(mk, msId) {
+  var ds = STATE.models[mk].metrics.intDetails, matched = 0, total = 0;
+  ds.forEach(function(d) { if (d.milestone === msId) { total++; if (d.matched) matched++; } });
+  return { matched: matched, total: total };
 }
-
-function toggleMsDetail(id,toggle){
-  var el=document.getElementById(id);
-  if(!el)return;
-  var show=el.style.display==='none';
-  el.style.display=show?'block':'none';
-  if(toggle)toggle.innerHTML=(show?'&#9660;':'&#9654;')+' Continuation criteria';
+/* ═══════════════════════════════════════════════════════════
+   UTILITIES
+   ═══════════════════════════════════════════════════════════ */
+function esc(s) { if (!s) return ''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function trunc(s, n) { if (!s) return ''; s = String(s).trim(); return s.length > n ? s.slice(0, n) + '\n\u2026 (truncated)' : s; }
+function formatModelName(dir) {
+  var n = dir.replace(/^vm-/, '');
+  n = n.replace(/-(\d+)-(\d+)/g, ' $1.$2').replace(/-/g, ' ');
+  n = n.replace(/\b\w/g, function(c) { return c.toUpperCase(); });
+  n = n.replace(/\bGpt\b/g, 'GPT').replace(/\s+Preview$/i, '');
+  return n;
 }
-
-function scrollToRubric(idx){
-  var convo=document.getElementById('convo');
-  var totalH=convo.scrollHeight-convo.clientHeight;
-  if(totalH<=0)return;
-  var rubricCount=Object.keys(DATA.rubrics||{}).length||1;
-  convo.scrollTo({top:(idx/rubricCount)*totalH,behavior:'smooth'});
-}
-
-function jumpToPrompt(idx){
-  var target=document.getElementById('prompt-'+idx);
-  if(!target)return;
-  var body=document.getElementById('tbody_'+idx),arr=document.getElementById('tarr_'+idx);
-  if(body&&!body.classList.contains('open')){body.classList.add('open');if(arr)arr.classList.add('open')}
-  target.scrollIntoView({behavior:'smooth',block:'start'});
-  document.querySelectorAll('.pn-item').forEach(function(el,i){el.classList.toggle('active',i===idx)});
-}
-
-function onScroll(){
-  var convo=document.getElementById('convo');
-  var scrollTop=convo.scrollTop;
-  var groups=convo.querySelectorAll('.turn-group');
-  var activeIdx=0;
-  groups.forEach(function(g,i){
-    if(g.offsetTop<=scrollTop+80)activeIdx=i;
-  });
-  document.querySelectorAll('.pn-item').forEach(function(el,i){el.classList.toggle('active',i===activeIdx)});
-  var activeNav=document.querySelector('.pn-item.active');
-  if(activeNav)activeNav.scrollIntoView({behavior:'smooth',block:'nearest'});
-
-  var frac=scrollTop/(convo.scrollHeight-convo.clientHeight||1);
-  var cards=document.querySelectorAll('.rc[data-rubric]');
-  if(!cards.length)return;
-  var idx=Math.min(Math.floor(frac*cards.length),cards.length-1);
-  cards.forEach(function(c,i){c.classList.toggle('active',i===idx)});
-}
-
-/* ── Parse [tool: name] / [output] markers from flat content text ── */
-function parseInlineTools(text){
-  var parts=[],toolRegex=/\[tool:\s*(\w+)\]/g,matches=[],m;
-  while((m=toolRegex.exec(text))!==null)matches.push({name:m[1],start:m.index,end:toolRegex.lastIndex});
-  if(!matches.length){var t=text.trim();return t?[{type:'text',text:t}]:[]}
-
-  var before=text.slice(0,matches[0].start).trim();
-  if(before)parts.push({type:'text',text:before});
-
-  for(var i=0;i<matches.length;i++){
-    var tm=matches[i];
-    var sectionEnd=(i+1<matches.length)?matches[i+1].start:text.length;
-    var section=text.slice(tm.end,sectionEnd);
-    var toolName=tm.name,output='';
-    var outputIdx=section.indexOf('[output]');
-    if(outputIdx!==-1)output=section.slice(outputIdx+8).trim();
-
-    var state={input:{},output:output,title:toolName};
-
-    if(toolName==='todowrite'&&output){
-      try{
-        var bs=output.indexOf('['),be=output.lastIndexOf(']');
-        if(bs!==-1&&be>bs){var todos=JSON.parse(output.slice(bs,be+1));if(Array.isArray(todos))state.input={todos:todos}}
-      }catch(e){}
-    }else if(toolName==='read'&&output){
-      var pm=output.match(/<path>(.*?)<\/path>/),cm=output.match(/<content>([\s\S]*?)<\/content>/);
-      if(pm)state.input={filePath:pm[1]};
-      if(cm)state.output=cm[1].trim();
-      state.title=pm?pm[1].split('/').pop():'read';
-    }else if(toolName==='bash'){
-      state.title=output?output.split('\n')[0].slice(0,60):'bash';
-    }else if(toolName==='write'&&output){
-      var dm=output.match(/<diagnostics\s+file="([^"]+)"/);
-      if(dm)state.input={filePath:dm[1]};
-      state.title=dm?dm[1].split('/').pop():'write';
-    }else if(toolName==='edit'&&output){
-      state.title='edit';
-    }
-
-    parts.push({type:'tool',tool:toolName,state:state});
-  }
-  return parts;
-}
-
-/* ── Extract messages from any trajectory format ── */
-function extractMessages(traj){
-  // Format A: turns-based (simplified trajectory)
-  if(traj.turns&&Array.isArray(traj.turns)&&!traj.messages){
-    var result=[];
-    traj.turns.forEach(function(t){
-      var role=t.role||(t.prompt?'user':null),text=t.content||t.prompt||'';
-      if(role==='user'){result.push({_role:'user',_parts:[{type:'text',text:text}],_raw:t});return}
-      var parts=[];
-      if(text&&text.indexOf('[tool:')!==-1){
-        parts=parseInlineTools(text);
-      }else if(text){
-        parts.push({type:'text',text:text});
-      }
-      if(Array.isArray(t.actions)){t.actions.forEach(function(a){
-        if(typeof a!=='object'||a===null)return;
-        if(a.type==='read'&&a.file)parts.push({type:'tool',tool:'read',state:{input:{filePath:a.file},output:'(content)',title:a.file.split('/').pop()}});
-        else if(a.type==='edit'&&a.file){
-          var ch=a.changes||[];
-          ch.forEach(function(c){parts.push({type:'tool',tool:'edit',state:{input:{filePath:a.file,oldString:c.old||c.before||'',newString:c.new||c.after||''},output:'Edit applied',title:a.file.split('/').pop()}})});
-          if(!ch.length)parts.push({type:'tool',tool:'edit',state:{input:{filePath:a.file},output:'edited',title:a.file.split('/').pop()}});
-        }
-        else if((a.type==='shell'||a.type==='bash')&&a.command)parts.push({type:'tool',tool:'bash',state:{input:{command:a.command,description:a.command},output:a.result||a.output||'',title:a.command.slice(0,60)}});
-        else if(a.type==='explore')parts.push({type:'text',text:'Explore: '+(a.description||a.query||'')});
-      })}
-      if(t.files_read)t.files_read.forEach(function(f){parts.push({type:'tool',tool:'read',state:{input:{filePath:f},output:'(content)',title:f.split('/').pop()}})});
-      if(t.edits)t.edits.forEach(function(ed){parts.push({type:'tool',tool:'edit',state:{input:{filePath:ed.file||'',oldString:ed.old||ed.before||'',newString:ed.new||ed.after||''},output:'Edit',title:(ed.file||'').split('/').pop()}})});
-      if(t.commands_run)t.commands_run.forEach(function(c){parts.push({type:'tool',tool:'bash',state:{input:{command:c,description:c},output:t.test_result||'',title:c}})});
-      if(parts.length)result.push({_role:'assistant',_parts:parts,_raw:t});
-    });
-    return result;
-  }
-
-  // Format B: messages array (rich trajectory with parts)
-  var raw=[];
-  if(Array.isArray(traj))raw=traj;
-  else if(traj.messages)raw=traj.messages;
-  else return[];
-
-  return raw.filter(function(m){return typeof m==='object'&&m!==null}).map(function(m){
-    // Has info+parts (standard rich format)
-    if(m.info&&m.parts&&m.parts.length>0)return{_role:m.info.role,_parts:m.parts,_raw:m,_tokens:m.info.tokens};
-    // Has role+parts
-    if(m.role&&m.parts&&m.parts.length>0)return{_role:m.role,_parts:m.parts,_raw:m,_tokens:m.tokens};
-    // Has data wrapper
-    if(m.data){
-      var d=m.data;
-      if(typeof d==='string'){try{d=JSON.parse(d)}catch(e){d={}}}
-      if(typeof d==='object'&&d.role){
-        var p=d.parts||[];
-        if(!p.length&&d.summary&&d.summary.diffs){
-          d.summary.diffs.forEach(function(df){
-            p.push({type:'text',text:'File: '+df.file+' (+'+(df.additions||0)+'/-'+(df.deletions||0)+')'});
-            if(df.before&&df.after)p.push({type:'tool',tool:'edit',state:{input:{filePath:df.file,oldString:df.before,newString:df.after},output:'diff',title:df.file.split('/').pop()}});
-          });
-        }
-        if(!p.length&&d.role==='assistant'){
-          var desc=d.modelID||'assistant';
-          if(d.tokens)desc+=' | '+(d.tokens.output||0)+' out';
-          if(d.finish)desc+=' | '+d.finish;
-          p.push({type:'text',text:'['+desc+']'});
-        }
-        if(!p.length&&d.role==='user')p.push({type:'text',text:'(user prompt)'});
-        return{_role:d.role,_parts:p,_raw:m,_tokens:d.tokens};
-      }
-    }
-    // Has role (minimal format)
-    if(m.role){
-      var p=[];
-      if(m.role==='user'){
-        if(m.content)p.push({type:'text',text:typeof m.content==='string'?m.content:JSON.stringify(m.content)});
-        if(m.summary&&m.summary.diffs){
-          m.summary.diffs.forEach(function(df){
-            p.push({type:'text',text:'File: '+df.file+' (+'+(df.additions||0)+'/-'+(df.deletions||0)+')'});
-            if(df.before&&df.after)p.push({type:'tool',tool:'edit',state:{input:{filePath:df.file,oldString:df.before,newString:df.after},output:'diff',title:df.file.split('/').pop()}});
-          });
-        }
-        if(m.files_in_context)p.push({type:'text',text:'Files: '+m.files_in_context.join(', ')});
-        if(!p.length)p.push({type:'text',text:'(user prompt)'});
-      }
-      if(m.role==='assistant'){
-        if(m.content)p.push({type:'text',text:typeof m.content==='string'?m.content:JSON.stringify(m.content)});
-        if(m.tool_calls&&Array.isArray(m.tool_calls)){
-          m.tool_calls.forEach(function(tc){
-            var fn=tc.function||tc;
-            var name=fn.name||fn.type||'tool';
-            var args=fn.arguments||fn.input||{};
-            if(typeof args==='string'){try{args=JSON.parse(args)}catch(e){args={raw:args}}}
-            p.push({type:'tool',tool:name,state:{input:args,output:'',title:name}});
-          });
-        }
-        if(!p.length){
-          var desc=m.modelID||m.model||'assistant';
-          if(m.tokens)desc+=' | '+(m.tokens.output||0)+' out';
-          if(m.finish)desc+=' | '+m.finish;
-          p.push({type:'text',text:'['+desc+']'});
-        }
-      }
-      if(m.role==='tool'||m.role==='function'){
-        return null;
-      }
-      return{_role:m.role,_parts:p,_raw:m,_tokens:m.tokens};
-    }
-    // Has info wrapper
-    if(m.info){
-      var p=[],role=m.info.role||'unknown';
-      if(role==='assistant'&&m.info.tokens)p.push({type:'text',text:'['+(m.info.modelID||'assistant')+' | '+(m.info.tokens.output||0)+' out]'});
-      if(role==='user'){
-        var s=m.info.summary;
-        if(s&&s.diffs)s.diffs.forEach(function(df){
-          p.push({type:'text',text:'File: '+df.file});
-          if(df.before&&df.after)p.push({type:'tool',tool:'edit',state:{input:{filePath:df.file,oldString:df.before,newString:df.after},output:'diff',title:df.file.split('/').pop()}});
-        });
-        if(!p.length)p.push({type:'text',text:'(user prompt)'});
-      }
-      return{_role:role,_parts:p,_raw:m,_tokens:m.info.tokens};
-    }
-    return{_role:'unknown',_parts:[{type:'text',text:JSON.stringify(m).slice(0,200)}],_raw:m};
-  }).filter(Boolean);
-}
-
-/* ── Stats bar ── */
-function renderStats(traj){
-  if(!traj){document.getElementById('statsbar').innerHTML='';return}
-  var msgs=extractMessages(traj),n=msgs.length,tc=0,tt=0,ot=0,cr=0;
-  var info=traj.info||traj.session||{},sm=info.summary||traj.summary||{};
-  var a=sm.additions||info.summary_additions||traj.summary_additions||0,d=sm.deletions||info.summary_deletions||traj.summary_deletions||0,f=sm.files||sm.files_changed||info.summary_files||traj.summary_files||0;
-  var ti=info.time||{},dur=0;
-  if(ti.created&&ti.updated)dur=Math.round((ti.updated-ti.created)/1000);
-  else if(info.time_created&&info.time_updated)dur=Math.round((info.time_updated-info.time_created)/1000);
-  else if(traj.time_created&&traj.time_updated)dur=Math.round((traj.time_updated-traj.time_created)/1000);
-
-  msgs.forEach(function(m){
-    var tok=m._tokens||(m._raw&&m._raw.info?m._raw.info.tokens:null)||(m._raw&&m._raw.tokens?m._raw.tokens:null);
-    if(tok){tt+=tok.total||0;ot+=tok.output||0;cr+=(tok.cache?tok.cache.read:0)||0}
-    (m._parts||[]).forEach(function(p){if(p.type==='tool')tc++});
-  });
-
-  var parts=[];
-  parts.push('<span><b>'+n+'</b> messages</span>');
-  if(tc)parts.push('<span><b>'+tc+'</b> tool calls</span>');
-  if(tt)parts.push('<span><b>'+tt.toLocaleString()+'</b> tokens ('+ot.toLocaleString()+' out'+(cr?', '+cr.toLocaleString()+' cached':'')+')</span>');
-  if(a||d)parts.push('<span><b>+'+a+'/-'+d+'</b> lines, <b>'+f+'</b> files</span>');
-  if(dur)parts.push('<span><b>'+Math.floor(dur/60)+'m'+(dur%60)+'s</b></span>');
-  document.getElementById('statsbar').innerHTML=parts.join('');
-}
-
-/* ── Utilities ── */
-function esc(s){if(!s)return'';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
-function trunc(s,n){if(!s)return'';s=String(s).trim();return s.length>n?s.slice(0,n)+'\n... (truncated)':s}
-function toolLabel(p){
-  var s=p.state||{},i=s.input||{},t=p.tool||'';
-  if(t==='bash')return i.description||(i.command?i.command.slice(0,60):'')||'bash';
-  if(t==='read')return(i.filePath||i.file_path||i.path||'').split('/').pop()||'read';
-  if(t==='edit'||t==='apply_patch')return(i.filePath||i.file_path||i.path||'').split('/').pop()||'edit';
-  if(t==='write')return(i.filePath||i.file_path||i.path||'').split('/').pop()||'write';
-  if(t==='grep')return'grep: '+(i.pattern||'').slice(0,40);
-  if(t==='glob')return'glob: '+(i.pattern||i.glob_pattern||'').slice(0,40);
-  if(t==='todowrite')return(i.todos?i.todos.length:0)+' todos';
-  if(t==='task')return i.description||'subtask';
-  return s.title||t;
+function toolLabel(tn, inp) {
+  if (tn === 'bash') return inp.description || (inp.command ? inp.command.slice(0, 60) : '') || 'bash';
+  if (tn === 'read') return (inp.filePath || inp.file_path || inp.path || '').split('/').pop() || 'read';
+  if (tn === 'edit' || tn === 'apply_patch') return (inp.filePath || inp.file_path || inp.path || '').split('/').pop() || 'edit';
+  if (tn === 'write') return (inp.filePath || inp.file_path || inp.path || '').split('/').pop() || 'write';
+  if (tn === 'grep') return 'grep: ' + (inp.pattern || '').slice(0, 40);
+  if (tn === 'glob') return 'glob: ' + (inp.pattern || inp.glob_pattern || '').slice(0, 40);
+  return tn;
 }
 </script>
 </body>
