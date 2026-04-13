@@ -686,7 +686,7 @@ function renderMilestonePanel(model) {
   var html = '<h3>Milestones (' + m.msCompleted + '/' + m.msTotal + ')</h3>';
   m.msDetails.forEach(function(ms) {
     var sc = ms.status === 'completed' ? 'ms-done' : ms.status === 'in_progress' ? 'ms-active' : 'ms-pending';
-    var promptIdx = ms.startTurn ? Math.floor((ms.startTurn - 1) / 2) : 0;
+    var promptIdx = turnToPromptIdx(model, ms.startTurn);
     html += '<div class="ms-card ' + sc + '" onclick="jumpToPrompt(' + promptIdx + ')">';
     html += '<div class="ms-head"><span class="ms-id">' + ms.id.toUpperCase() + '</span>';
     html += '<span class="ms-status ms-status-' + ms.status + '">' + ms.status.replace('_', ' ') + '</span></div>';
@@ -730,6 +730,17 @@ function jumpToPrompt(idx) {
 /* ═══════════════════════════════════════════════════════════
    DATA HELPERS
    ═══════════════════════════════════════════════════════════ */
+function turnToPromptIdx(model, turnNum) {
+  if (!turnNum) return 0;
+  var idx = 0;
+  for (var i = 0; i < model.turns.length; i++) {
+    if (model.turns[i].role === 'user') {
+      if (model.turns[i].turn_number >= turnNum) return idx;
+      idx++;
+    }
+  }
+  return Math.max(0, idx - 1);
+}
 function buildMsMap(model) {
   var map = {};
   (model.metrics.msDetails || []).forEach(function(ms) { if (ms.startTurn) map[ms.startTurn] = ms.id; });
