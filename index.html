@@ -539,7 +539,7 @@ function computeMetrics(model) {
     });
   });
 
-  // Tool call counts (from opencode data)
+  // Tool call counts (from opencode data or inline markers)
   var totalTools = 0, toolCounts = {};
   if (model.opencode && model.opencode.messages) {
     model.opencode.messages.forEach(function(msg) {
@@ -550,6 +550,19 @@ function computeMetrics(model) {
           toolCounts[tn] = (toolCounts[tn] || 0) + 1;
         }
       });
+    });
+  } else {
+    // Count from inline [tool: name] markers in flat trajectory content
+    model.turns.forEach(function(t) {
+      if (t.role !== 'assistant') return;
+      var c = contentToStr(t.content);
+      var m;
+      var re = /\[tool: (\w+)\]/g;
+      while ((m = re.exec(c)) !== null) {
+        totalTools++;
+        var tn = m[1] || 'other';
+        toolCounts[tn] = (toolCounts[tn] || 0) + 1;
+      }
     });
   }
 
@@ -770,7 +783,14 @@ function renderConvoSimple(el, model) {
     html += '</div>';
     html += '<div class="turn-body open" id="tbody_' + idx + '">';
     if (g.user) html += '<div class="msg-user"><div class="msg-user-label">User</div><div class="msg-user-text">' + esc(userText) + '</div></div>';
-    g.assistants.forEach(function(a) { html += '<div class="msg-asst"><div class="asst-text">' + esc(contentToStr(a.content) || '(no response)') + '</div></div>'; });
+    g.assistants.forEach(function(a) {
+      var c = contentToStr(a.content);
+      if (c && c.indexOf('[tool:') !== -1) {
+        html += '<div class="msg-asst">' + renderInlineParts(parseInlineTools(c)) + '</div>';
+      } else {
+        html += '<div class="msg-asst"><div class="asst-text">' + esc(c || '(no response)') + '</div></div>';
+      }
+    });
     html += '</div></div>';
   });
   el.innerHTML = html;
@@ -827,7 +847,128 @@ function renderConvoOpencode(el, model) {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   TOOL BLOCKS
+   INLINE TOOL PARSER (flat trajectory format)
+   ═══════════════════════════════════════════════════════════ */
+function parseInlineTools(content) {
+  if (!content || content.indexOf('[tool:') === -1) {
+    return content ? [{ type: 'text', content: content }] : [];
+  }
+  var segments = content.split(/(?=\[tool: )/);
+  var parts = [];
+  segments.forEach(function(seg) {
+    seg = seg.trim();
+    if (!seg) return;
+    if (seg.indexOf('[tool: ') !== 0) {
+      if (seg) parts.push({ type: 'text', content: seg });
+      return;
+    }
+    var firstNL = seg.indexOf('\n');
+    var firstLine = firstNL >= 0 ? seg.slice(0, firstNL) : seg;
+    var body = firstNL >= 0 ? seg.slice(firstNL + 1) : '';
+    var nameMatch = firstLine.match(/^\[tool: (\w+)\]\s*(.*)/);
+    if (!nameMatch) { parts.push({ type: 'text', content: seg }); return; }
+    var toolName = nameMatch[1];
+    var titleText = nameMatch[2].trim();
+    var output = '', oldStr = '', newStr = '';
+
+    // Extract [output]
+    var outIdx = body.indexOf('[output] ');
+    if (outIdx !== -1) {
+      output = body.slice(outIdx + 9).trim();
+      var beforeOut = body.slice(0, outIdx).trim();
+      if (beforeOut && !titleText) titleText = beforeOut.split('\n')[0];
+    }
+    // Extract [answer] (question tool)
+    var ansIdx = body.indexOf('[answer] ');
+    if (ansIdx !== -1) {
+      output = body.slice(ansIdx + 9).trim();
+    }
+    // For edit tools, extract old/new
+    if ((toolName === 'edit' || toolName === 'apply_patch') && body.indexOf('  old: ') !== -1) {
+      var oldMatch = body.match(/\s+old: ([\s\S]*?)(?=\n\s*new: )/);
+      var newMatch = body.match(/\s+new: ([\s\S]*?)$/);
+      if (oldMatch) oldStr = oldMatch[1].trim();
+      if (newMatch) newStr = newMatch[1].trim();
+    }
+    parts.push({ type: 'tool', tool: toolName, title: titleText, output: output, oldStr: oldStr, newStr: newStr });
+  });
+  return parts;
+}
+
+function renderInlineParts(parts) {
+  var html = '';
+  parts.forEach(function(p) {
+    if (p.type === 'text') {
+      html += '<div class="asst-text">' + esc(p.content) + '</div>';
+    } else {
+      html += renderInlineTool(p);
+    }
+  });
+  return html;
+}
+
+function renderInlineTool(p) {
+  var tn = p.tool;
+  var id = 't_' + Math.random().toString(36).slice(2, 8);
+  var title = p.title || tn;
+  var html = '<div class="tool-block tbl-' + tn + '"><div class="tool-header" onclick="toggleTool(\'' + id + '\')">';
+  html += '<span class="arrow" id="arr_' + id + '">&#9654;</span>';
+  html += '<span class="tool-badge tb-' + tn + '">' + (LABELS[tn] || tn) + '</span>';
+  html += '<span class="tool-title">' + esc(title) + '</span>';
+  html += '</div><div class="tool-body" id="' + id + '">';
+
+  if (tn === 'edit' || tn === 'apply_patch') {
+    if (p.title) html += '<div style="color:var(--text-muted);font-size:11px;margin-bottom:6px;font-family:var(--mono)">' + esc(p.title) + '</div>';
+    if (p.oldStr || p.newStr) {
+      html += '<div class="diff">';
+      if (p.oldStr) p.oldStr.split('\n').forEach(function(l) { html += '<span class="del">- ' + esc(l) + '</span>'; });
+      if (p.newStr) p.newStr.split('\n').forEach(function(l) { html += '<span class="add">+ ' + esc(l) + '</span>'; });
+      html += '</div>';
+    }
+  } else if (tn === 'bash') {
+    if (p.title) html += '<div class="codeblock"><span class="cmd">$ ' + esc(p.title) + '</span></div>';
+    if (p.output) html += '<div class="codeblock"><span class="out">' + esc(trunc(p.output, 3000)) + '</span></div>';
+  } else if (tn === 'read') {
+    if (p.title) html += '<div style="color:var(--text-muted);font-size:11px;margin-bottom:4px;font-family:var(--mono)">' + esc(p.title) + '</div>';
+    if (p.output) html += '<div class="codeblock">' + esc(trunc(p.output, 3000)) + '</div>';
+  } else if (tn === 'write') {
+    if (p.title) html += '<div style="color:var(--text-muted);font-size:11px;font-family:var(--mono)">' + esc(p.title) + '</div>';
+  } else if (tn === 'todowrite') {
+    var parsed = false;
+    if (p.output) {
+      try {
+        var todos = JSON.parse(p.output);
+        if (Array.isArray(todos)) {
+          parsed = true;
+          html += '<div class="todo-list">';
+          todos.forEach(function(t) {
+            var s = (t.status || 'pending').replace(/\s+/g, '_');
+            var icon = s === 'completed' ? '&#10003;' : s === 'in_progress' ? '&#9679;' : '';
+            html += '<div class="todo-item td-' + s + '">';
+            html += '<div class="todo-check">' + icon + '</div>';
+            html += '<div class="todo-content">' + esc(t.content || '') + '</div>';
+            if (t.priority) html += '<span class="todo-priority tp-' + (t.priority || 'medium') + '">' + esc(t.priority) + '</span>';
+            html += '</div>';
+          });
+          html += '</div>';
+        }
+      } catch(e) {}
+    }
+    if (!parsed && p.output) html += '<div class="codeblock">' + esc(trunc(p.output, 2000)) + '</div>';
+  } else if (tn === 'question') {
+    html += '<div class="ask-block"><div class="ask-text">' + esc(p.title || '') + '</div>';
+    if (p.output) html += '<div style="margin-top:6px;font-size:11px;color:var(--text-sec)">' + esc(p.output) + '</div>';
+    html += '</div>';
+  } else {
+    if (p.title) html += '<div class="codeblock">' + esc(p.title) + '</div>';
+    if (p.output) html += '<div class="codeblock">' + esc(trunc(p.output, 2000)) + '</div>';
+  }
+  html += '</div></div>';
+  return html;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   TOOL BLOCKS (opencode structured format)
    ═══════════════════════════════════════════════════════════ */
 function renderToolBlock(p) {
   var tn = p.tool || 'tool', st = p.state || {}, inp = st.input || {}, out = st.output || '', meta = st.metadata || {}, time = st.time || {};
