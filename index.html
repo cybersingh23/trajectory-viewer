@@ -251,10 +251,10 @@ input[type=file]{display:none}
   <div class="loader-sub">Multi-model trajectory analysis</div>
   <div class="drop-zone glass" id="drop-zone">
     <div class="dz-icon">&#128193;</div>
-    <h2>Drop a task folder here</h2>
-    <p>Upload a folder containing <b>vm-*</b> model directories<br>
-    Each should have <b>task.json</b>, <b>trajectories/</b>, and optionally <b>opencode_export.json</b><br><br>
-    Or drop individual JSON files</p>
+    <h2>Drop files or a folder here</h2>
+    <p>Drop <b>trajectory JSON files</b> (one per model)<br>
+    Or a folder with <b>vm-*</b> model directories containing task.json + trajectories/<br><br>
+    <span style="color:var(--text-dim)">Supports flat trajectory format &amp; opencode format</span></p>
   </div>
   <div class="load-status" id="load-status"></div>
   <button class="launch-btn" id="launch-btn" onclick="launch()">Launch Viewer</button>
@@ -358,6 +358,8 @@ function handleFileList(fileList) {
 
 function processFiles(files) {
   statusEl.textContent = 'Processing ' + files.length + ' files\u2026';
+
+  // First: check if any files are in vm-* directories (folder upload format)
   var groups = {}, ungrouped = [];
   files.forEach(function(f) {
     var path = f._path || f.name, parts = path.split('/'), modelDir = null;
@@ -366,10 +368,62 @@ function processFiles(files) {
     if (!groups[modelDir]) groups[modelDir] = [];
     groups[modelDir].push(f);
   });
-  if (!Object.keys(groups).length && ungrouped.length) { groups['model_1'] = ungrouped; }
-  var modelKeys = Object.keys(groups);
-  if (!modelKeys.length) { statusEl.textContent = 'No valid files found'; return; }
 
+  // If we found vm-* groups, use folder-based loading
+  if (Object.keys(groups).length) {
+    processFolderUpload(groups);
+    return;
+  }
+
+  // Otherwise: treat each JSON file as a potential flat trajectory
+  var jsonFiles = ungrouped.filter(function(f) { return (f.name || '').endsWith('.json'); });
+  if (!jsonFiles.length) { statusEl.textContent = 'No valid JSON files found'; return; }
+
+  var total = jsonFiles.length, loaded = 0;
+  jsonFiles.forEach(function(f, idx) {
+    readJSON(f).then(function(data) {
+      if (!data) { loaded++; if (loaded === total) finishLoad(); return; }
+
+      // Detect flat trajectory format: has "turns" array at root
+      if (data.turns && Array.isArray(data.turns)) {
+        var modelName = data.model || f.name.replace(/\.json$/i, '').replace(/\s*\(\d+\)\s*$/, '');
+        // Avoid collisions if multiple files have same model name
+        if (STATE.models[modelName]) modelName = modelName + '_' + (idx + 1);
+        var m = { name: modelName, key: modelName, task: null, opencode: null };
+        m.turns = data.turns;
+        m.milestoneProgress = data.milestone_progress || [];
+        // Build a synthetic task from metadata
+        if (data.metadata && !STATE.task) {
+          STATE.task = {
+            task_title: data.metadata.title || data.task_id || '',
+            task_id: data.task_id || ''
+          };
+        }
+        m.metrics = computeMetrics(m);
+        STATE.models[modelName] = m;
+      }
+      // Detect opencode format: has "messages" array
+      else if (data.messages && Array.isArray(data.messages)) {
+        var ocName = f.name.replace(/\.json$/i, '').replace(/\s*\(\d+\)\s*$/, '');
+        if (STATE.models[ocName]) ocName = ocName + '_' + (idx + 1);
+        STATE.models[ocName] = buildModel(ocName, { name: ocName, task: null, trajectory: null, opencode: data, milestoneProgressRaw: null });
+      }
+      // Detect wrapped trajectory: has "trajectory.turns" or is a task.json
+      else if (data.trajectory && data.trajectory.turns) {
+        var wrappedName = data.model || f.name.replace(/\.json$/i, '');
+        if (STATE.models[wrappedName]) wrappedName = wrappedName + '_' + (idx + 1);
+        STATE.models[wrappedName] = buildModel(wrappedName, { name: wrappedName, task: null, trajectory: data.trajectory, opencode: null, milestoneProgressRaw: null });
+      }
+
+      loaded++;
+      statusEl.textContent = 'Loaded ' + loaded + '/' + total + ' files';
+      if (loaded === total) finishLoad();
+    });
+  });
+}
+
+function processFolderUpload(groups) {
+  var modelKeys = Object.keys(groups);
   var total = modelKeys.length, loaded = 0;
   modelKeys.forEach(function(mk) {
     var g = groups[mk];
