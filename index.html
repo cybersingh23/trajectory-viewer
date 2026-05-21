@@ -1140,7 +1140,7 @@ function renderToolBlock(p) {
   var file = inp.filePath || inp.file_path || inp.path || '';
   var oldStr = inp.oldString || inp.old_string || '';
   var newStr = inp.newString || inp.new_string || '';
-  var summary = toolSummary(tn, { cmd: cmd, file: file, oldStr: oldStr, newStr: newStr, pattern: inp.pattern || inp.glob_pattern || '', questions: inp.questions || [], todos: inp.todos || [], title: st.title || toolLabel(tn, inp) });
+  var summary = toolSummary(tn, { cmd: cmd, file: file, oldStr: oldStr, newStr: newStr, pattern: inp.pattern || inp.glob_pattern || '', questions: ensureArray(inp.questions), todos: ensureArray(inp.todos), title: st.title || toolLabel(tn, inp) });
   var copyText = '';
   if (tn === 'bash') copyText = cmd;
   else if (tn === 'edit' || tn === 'apply_patch') copyText = newStr || oldStr || '';
@@ -1166,13 +1166,14 @@ function renderToolBlock(p) {
     if (out) html += renderCodeBlock(out);
   } else if (tn === 'question') {
     html += '<div class="ask-block">';
-    (inp.questions || []).forEach(function(q) {
+    ensureArray(inp.questions).forEach(function(q) {
       html += '<div class="ask-q">';
       if (q.header) html += '<div class="ask-label">' + esc(q.header) + '</div>';
       html += '<div class="ask-text">' + esc(q.question || '') + '</div>';
-      if (q.options && q.options.length) {
+      var opts = ensureArray(q.options);
+      if (opts.length) {
         html += '<div class="ask-opts">';
-        q.options.forEach(function(o) {
+        opts.forEach(function(o) {
           html += '<div class="ask-opt">' + esc(o.label || '');
           if (o.description) html += ' <span class="ask-opt-desc">&mdash; ' + esc(o.description) + '</span>';
           html += '</div>';
@@ -1183,8 +1184,8 @@ function renderToolBlock(p) {
     });
     html += '</div>';
   } else if (tn === 'todowrite') {
-    var todos = inp.todos || [];
-    if (!todos.length && out) { try { todos = JSON.parse(out); } catch(e) {} }
+    var todos = ensureArray(inp.todos);
+    if (!todos.length && out) todos = ensureArray(out);
     html += '<div class="todo-list">';
     todos.forEach(function(t) {
       var s = (t.status || 'pending').replace(/\s+/g, '_');
@@ -1641,6 +1642,13 @@ function getIntsForMs(mk, msId) {
    UTILITIES
    ═══════════════════════════════════════════════════════════ */
 function esc(s) { if (!s) return ''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function ensureArray(v) {
+  if (Array.isArray(v)) return v;
+  if (typeof v === 'string') {
+    try { var p = JSON.parse(v); return Array.isArray(p) ? p : []; } catch (e) { return []; }
+  }
+  return [];
+}
 function trunc(s, n) { if (!s) return ''; s = String(s).trim(); return s.length > n ? s.slice(0, n) + '\n\u2026 (truncated)' : s; }
 function contentToStr(c) {
   if (!c) return '';
@@ -1662,8 +1670,8 @@ function toolLabel(tn, inp) {
   if (tn === 'write') return (inp.filePath || inp.file_path || inp.path || '').split('/').pop() || 'write';
   if (tn === 'grep') return 'grep: ' + (inp.pattern || '').slice(0, 40);
   if (tn === 'glob') return 'glob: ' + (inp.pattern || inp.glob_pattern || '').slice(0, 40);
-  if (tn === 'question') { var qs = inp.questions || []; return qs.length ? (qs[0].header || qs[0].question || '').slice(0, 60) : 'question'; }
-  if (tn === 'todowrite') { var td = inp.todos || []; return td.length + ' item' + (td.length !== 1 ? 's' : ''); }
+  if (tn === 'question') { var qs = ensureArray(inp.questions); return qs.length ? (qs[0].header || qs[0].question || '').slice(0, 60) : 'question'; }
+  if (tn === 'todowrite') { var td = ensureArray(inp.todos); return td.length + ' item' + (td.length !== 1 ? 's' : ''); }
   return tn;
 }
 </script>
