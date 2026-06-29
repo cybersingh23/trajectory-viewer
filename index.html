@@ -1369,16 +1369,24 @@ function promptMatchScore(a, b) {
   var na = normalizePrompt(a), nb = normalizePrompt(b);
   if (!na || !nb) return 0;
   if (na === nb) return 1;
-  var sigA = na.slice(0, 120), sigB = nb.slice(0, 120);
-  if (na.indexOf(sigB) !== -1 || nb.indexOf(sigA) !== -1) return 0.95;
-  var wordsA = na.split(' ').filter(function(w) { return w.length > 3; });
-  var wordsB = nb.split(' ').filter(function(w) { return w.length > 3; });
-  if (!wordsA.length || !wordsB.length) return 0;
-  var setB = {}; wordsB.forEach(function(w) { setB[w] = true; });
-  var hits = 0;
-  wordsA.forEach(function(w) { if (setB[w]) hits++; });
-  var denom = Math.max(wordsA.length, wordsB.length);
-  return hits / denom;
+  // One prompt fully contained in the other counts as a strong match, but only when
+  // their lengths are comparable. This catches lightly truncated/extended variants while
+  // rejecting two prompts that merely share a long preamble and then diverge (in which
+  // case neither contains the other).
+  var shorter = na.length <= nb.length ? na : nb;
+  var longer = na.length <= nb.length ? nb : na;
+  if (longer.indexOf(shorter) !== -1 && shorter.length / longer.length >= 0.8) return 0.95;
+  // Otherwise: symmetric Jaccard overlap of significant words. Divergent content grows the
+  // union and drives the score down, so a shared boilerplate prefix alone won't match.
+  var setA = {}, setB = {};
+  na.split(' ').forEach(function(w) { if (w.length > 3) setA[w] = true; });
+  nb.split(' ').forEach(function(w) { if (w.length > 3) setB[w] = true; });
+  var keysA = Object.keys(setA), keysB = Object.keys(setB);
+  if (!keysA.length || !keysB.length) return 0;
+  var inter = 0, union = {};
+  keysA.forEach(function(w) { union[w] = true; if (setB[w]) inter++; });
+  keysB.forEach(function(w) { union[w] = true; });
+  return inter / Object.keys(union).length;
 }
 
 function computeSbsAnchors(groupsA, groupsB) {
@@ -1543,9 +1551,12 @@ function renderSbsView() {
 
   anchorRes.anchors.forEach(function(an, i) {
     var gA = groupsA[an.aIdx], gB = groupsB[an.bIdx];
-    var ut = groupUserText(gA) || groupUserText(gB) || '(no user prompt)';
+    var utA = groupUserText(gA), utB = groupUserText(gB);
+    var promptsDiffer = utA && utB && normalizePrompt(utA) !== normalizePrompt(utB);
+    var ut = utA || utB || '(no user prompt)';
     var diffAfter = computeRunDiff(groupsA.slice(an.aIdx, an.aIdx + 1), groupsB.slice(an.bIdx, an.bIdx + 1));
     var badges = '';
+    if (promptsDiffer) badges += '<span class="sbs-badge b-tools">prompts differ</span>';
     if (diffAfter.toolsDiffer) badges += '<span class="sbs-badge b-tools">tools differ</span>';
     if (diffAfter.fileDiffCount > 0) badges += '<span class="sbs-badge b-files">files Δ ' + diffAfter.fileDiffCount + '</span>';
     if (diffAfter.lengthSkew) badges += '<span class="sbs-badge b-length">length skew</span>';
@@ -1557,7 +1568,14 @@ function renderSbsView() {
     scrollHtml += '<span class="sbs-anchor-idx">A #' + (an.aIdx + 1) + ' · B #' + (an.bIdx + 1) + '</span>';
     scrollHtml += badges;
     scrollHtml += '</div>';
-    scrollHtml += '<div class="sbs-anchor-body"><div class="msg-user"><div class="msg-user-label">User</div><div class="msg-user-text">' + esc(ut) + '</div></div></div>';
+    if (promptsDiffer) {
+      scrollHtml += '<div class="sbs-anchor-body">';
+      scrollHtml += '<div class="msg-user"><div class="msg-user-label">User · A</div><div class="msg-user-text">' + esc(utA) + '</div></div>';
+      scrollHtml += '<div class="msg-user"><div class="msg-user-label">User · B</div><div class="msg-user-text">' + esc(utB) + '</div></div>';
+      scrollHtml += '</div>';
+    } else {
+      scrollHtml += '<div class="sbs-anchor-body"><div class="msg-user"><div class="msg-user-label">User</div><div class="msg-user-text">' + esc(ut) + '</div></div></div>';
+    }
     scrollHtml += '</div>';
 
     // Render the *single* assistant cells for this anchor (A's response and B's response side-by-side)
