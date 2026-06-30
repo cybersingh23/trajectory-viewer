@@ -1157,10 +1157,10 @@ function renderThinkingBlock(text) {
   var id = 'th_' + Math.random().toString(36).slice(2, 8);
   var html = '<div class="thinking-block">';
   html += '<div class="tool-header" onclick="toggleTool(\'' + id + '\')">';
-  html += '<span class="arrow open" id="arr_' + id + '">&#9654;</span>';
+  html += '<span class="arrow" id="arr_' + id + '">&#9654;</span>';
   html += '<span class="tool-badge tb-thinking">Thinking</span>';
   html += '</div>';
-  html += '<div class="tool-body open" id="' + id + '"><div class="thinking-text">' + esc(text) + '</div></div>';
+  html += '<div class="tool-body" id="' + id + '"><div class="thinking-text">' + esc(text) + '</div></div>';
   html += '</div>';
   return html;
 }
