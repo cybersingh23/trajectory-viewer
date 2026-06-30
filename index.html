@@ -164,6 +164,11 @@ input[type=file]{display:none}
 .diff .del{background:rgba(239,68,68,0.08);color:var(--red);display:block}.diff .add{background:rgba(74,222,128,0.08);color:var(--green);display:block}
 .empty-resp{padding:8px 12px;color:var(--text-dim);font-size:12px;font-style:italic;margin:4px 0}
 
+/* ═══ THINKING BLOCKS ═══ */
+.thinking-block{margin:4px 0;border:1px solid rgba(129,140,248,0.12);border-radius:var(--radius-sm);background:rgba(129,140,248,0.04);overflow:hidden;border-left:3px solid #818cf8}
+.thinking-block .tb-thinking{color:#a5b4fc;background:rgba(129,140,248,0.12)}
+.thinking-text{color:var(--text-muted);font-size:12px;line-height:1.7;white-space:pre-wrap;font-style:italic}
+
 /* ═══ ASK & TODO RENDERERS ═══ */
 .ask-block{margin:4px 0}
 .ask-q{margin-bottom:8px}
@@ -840,6 +845,11 @@ function buildGroups(model) {
   turns.forEach(function(t) {
     if (t.role === 'user') { if (cur2) groups2.push(cur2); cur2 = { user: t, assistants: [], format: 'simple' }; }
     else if (t.role === 'assistant') { if (!cur2) cur2 = { user: null, assistants: [], format: 'simple' }; cur2.assistants.push(t); }
+    else if (t.role === 'thinking' || t.thinking) {
+      if (!cur2) cur2 = { user: null, assistants: [], format: 'simple' };
+      var tx = contentToStr(t.thinking || t.content);
+      if (tx) cur2.assistants.push({ role: 'assistant', __thinking: tx });
+    }
   });
   if (cur2) groups2.push(cur2);
   return groups2;
@@ -865,6 +875,7 @@ function renderGroupBody(g, ctx) {
       var hasContent = false;
       (msg.parts || []).forEach(function(p) {
         if (p.type === 'step-start') { ctx.stepNum++; html += '<div class="step-header">Step ' + ctx.stepNum + '</div>'; }
+        else if (isThinkingPart(p)) { var tt = getThinkingText(p); if (tt) { hasContent = true; html += renderThinkingBlock(tt); } }
         else if (p.type === 'text' && p.text && p.text.trim()) { hasContent = true; html += '<div class="asst-text">' + esc(p.text.trim()) + '</div>'; }
         else if (p.type === 'tool') { hasContent = true; html += renderToolBlock(p); }
       });
@@ -873,6 +884,7 @@ function renderGroupBody(g, ctx) {
     });
   } else {
     g.assistants.forEach(function(a) {
+      if (a.__thinking) { html += '<div class="msg-asst">' + renderThinkingBlock(a.__thinking) + '</div>'; return; }
       var c = contentToStr(a.content);
       if (c && c.indexOf('[tool:') !== -1) {
         html += '<div class="msg-asst">' + renderInlineParts(parseInlineTools(c)) + '</div>';
@@ -1125,6 +1137,31 @@ function renderInlineTool(p) {
     if (p.output) html += renderCodeBlock(p.output);
   }
   html += '</div></div>';
+  return html;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   THINKING / REASONING BLOCKS
+   ═══════════════════════════════════════════════════════════ */
+function isThinkingPart(p) {
+  return !!p && (p.type === 'thinking' || p.type === 'reasoning' || p.type === 'redacted_thinking');
+}
+function getThinkingText(p) {
+  if (!p) return '';
+  var t = p.thinking || p.text || p.reasoning || '';
+  if (typeof t !== 'string') t = contentToStr(t);
+  if (!t && p.type === 'redacted_thinking') return '[redacted thinking]';
+  return t;
+}
+function renderThinkingBlock(text) {
+  var id = 'th_' + Math.random().toString(36).slice(2, 8);
+  var html = '<div class="thinking-block">';
+  html += '<div class="tool-header" onclick="toggleTool(\'' + id + '\')">';
+  html += '<span class="arrow open" id="arr_' + id + '">&#9654;</span>';
+  html += '<span class="tool-badge tb-thinking">Thinking</span>';
+  html += '</div>';
+  html += '<div class="tool-body open" id="' + id + '"><div class="thinking-text">' + esc(text) + '</div></div>';
+  html += '</div>';
   return html;
 }
 
