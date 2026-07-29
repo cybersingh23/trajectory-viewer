@@ -135,7 +135,8 @@ input[type=file]{display:none}
 .turn-header .arrow{color:var(--text-muted);font-size:10px;transition:transform .15s;width:14px;flex-shrink:0}
 .turn-header .arrow.open{transform:rotate(90deg)}
 .turn-num{font-size:11px;font-weight:700;color:var(--blue);flex-shrink:0}
-.turn-preview{color:var(--text-muted);font-size:11px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.turn-preview{color:var(--text-muted);font-size:11px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.turn-header .arrow.open ~ .turn-preview{visibility:hidden}
 .turn-body{display:none}.turn-body.open{display:block}
 .ms-badge{display:inline-block;padding:1px 5px;border-radius:4px;font-size:9px;font-weight:800;background:rgba(129,140,248,0.15);color:#818cf8;margin-left:4px}
 
@@ -253,9 +254,10 @@ input[type=file]{display:none}
 .sbs-scroll{flex:1;overflow-y:auto;padding:0 0 80px}
 .sbs-grid{display:grid;grid-template-columns:1fr 1fr;gap:0;column-gap:1px;background:var(--glass-border)}
 .sbs-anchor{grid-column:1 / -1;background:rgba(8,8,22,0.85);border-top:1px solid var(--glass-border);border-bottom:1px solid var(--glass-border);padding:0}
-.sbs-anchor-header{padding:10px 20px 6px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-.sbs-anchor-num{font-size:11px;font-weight:800;color:var(--purple);letter-spacing:0.3px}
-.sbs-anchor-idx{font-family:var(--mono);font-size:10px;color:var(--text-dim)}
+.sbs-anchor-header{padding:10px 20px 6px;display:flex;align-items:center;gap:10px;flex-wrap:nowrap}
+.sbs-anchor-num{font-size:11px;font-weight:800;color:var(--purple);letter-spacing:0.3px;flex-shrink:0}
+.sbs-anchor-idx{font-family:var(--mono);font-size:10px;color:var(--text-dim);flex-shrink:0}
+.sbs-anchor-header .sbs-badge{flex-shrink:0}
 .sbs-anchor-body{padding:0 20px 12px}
 .sbs-anchor .msg-user{margin:0;background:rgba(99,102,241,0.04);border-left-color:var(--purple)}
 .sbs-cell{padding:12px 14px;background:var(--bg);min-width:0;overflow-x:hidden}
@@ -695,7 +697,7 @@ function renderTopbar() {
     html += '<button class="act-btn" onclick="toggleAllTurnsSide(\'a-\')">Collapse A</button>';
     html += '<button class="act-btn" onclick="toggleAllTurnsSide(\'b-\')">Collapse B</button>';
   }
-  html += '<button class="act-btn" id="collapse-btn" onclick="toggleAllTurns()">Collapse all</button>';
+  html += '<button class="act-btn" id="collapse-btn" onclick="toggleAllTurns()">' + (STATE.allCollapsed ? 'Expand all' : 'Collapse all') + '</button>';
   html += '</div>';
   document.getElementById('topbar').innerHTML = html;
 }
@@ -904,14 +906,15 @@ function renderGroup(g, idx, model, opts) {
   var userText = groupUserText(g) || '(no user prompt)';
   var msId = msMap[idx];
   var isSaved = STATE.savedTurns.some(function(s) { return s.modelKey === model.key && s.promptIdx === idx; });
-  var openInit = opts.openInit !== false;
+  var openInit = opts.openInit !== undefined ? opts.openInit : !STATE.allCollapsed;
+  var previewSrc = opts.previewText !== undefined ? opts.previewText : userText;
 
   var html = '<div class="turn-group' + (msId ? ' ms-start' : '') + '" id="prompt-' + key + '">';
   html += '<div class="turn-header" onclick="toggleTurn(\'' + key + '\')">';
   html += '<span class="arrow' + (openInit ? ' open' : '') + '" id="tarr_' + key + '">&#9654;</span>';
-  html += '<span class="turn-num">Prompt ' + (idx + 1) + '</span>';
+  html += '<span class="turn-num">' + esc(opts.label || ('Prompt ' + (idx + 1))) + '</span>';
   if (msId) html += '<span class="ms-badge">' + msId.toUpperCase() + '</span>';
-  html += '<span style="flex:1"></span>';
+  html += '<span class="turn-preview">' + esc(previewLine(previewSrc)) + '</span>';
   if (!opts.hideSaveBtn) {
     html += '<button class="save-turn-btn' + (isSaved ? ' saved' : '') + '" onclick="event.stopPropagation();toggleSaveTurn(\'' + esc(model.key) + '\',' + idx + ',\'' + esc(userText.slice(0, 80).replace(/'/g, '')) + '\')" title="' + (isSaved ? 'Unsave' : 'Save for review') + '">&#9733;</button>';
   }
@@ -1599,19 +1602,23 @@ function renderSbsView() {
     if (diffAfter.lengthSkew) badges += '<span class="sbs-badge b-length">length skew</span>';
     if (!badges) badges = '<span class="sbs-badge b-none">✓ match</span>';
 
+    var akey = 'sbsanchor-' + i;
+    var anchorOpen = !STATE.allCollapsed;
     scrollHtml += '<div class="sbs-anchor">';
-    scrollHtml += '<div class="sbs-anchor-header">';
+    scrollHtml += '<div class="sbs-anchor-header turn-header" onclick="toggleTurn(\'' + akey + '\')">';
+    scrollHtml += '<span class="arrow' + (anchorOpen ? ' open' : '') + '" id="tarr_' + akey + '">&#9654;</span>';
     scrollHtml += '<span class="sbs-anchor-num">Prompt ' + (i + 1) + '</span>';
     scrollHtml += '<span class="sbs-anchor-idx">A #' + (an.aIdx + 1) + ' · B #' + (an.bIdx + 1) + '</span>';
     scrollHtml += badges;
+    scrollHtml += '<span class="turn-preview">' + esc(previewLine(ut)) + '</span>';
     scrollHtml += '</div>';
     if (promptsDiffer) {
-      scrollHtml += '<div class="sbs-anchor-body">';
+      scrollHtml += '<div class="sbs-anchor-body turn-body' + (anchorOpen ? ' open' : '') + '" id="tbody_' + akey + '">';
       scrollHtml += '<div class="msg-user"><div class="msg-user-label">User · A</div><div class="msg-user-text">' + esc(utA) + '</div></div>';
       scrollHtml += '<div class="msg-user"><div class="msg-user-label">User · B</div><div class="msg-user-text">' + esc(utB) + '</div></div>';
       scrollHtml += '</div>';
     } else {
-      scrollHtml += '<div class="sbs-anchor-body"><div class="msg-user"><div class="msg-user-label">User</div><div class="msg-user-text">' + esc(ut) + '</div></div></div>';
+      scrollHtml += '<div class="sbs-anchor-body turn-body' + (anchorOpen ? ' open' : '') + '" id="tbody_' + akey + '"><div class="msg-user"><div class="msg-user-label">User</div><div class="msg-user-text">' + esc(ut) + '</div></div></div>';
     }
     scrollHtml += '</div>';
 
@@ -1623,8 +1630,8 @@ function renderSbsView() {
 
     var asstOnlyA = { user: null, assistants: gA.assistants, format: gA.format };
     var asstOnlyB = { user: null, assistants: gB.assistants, format: gB.format };
-    scrollHtml += '<div class="sbs-cell left ' + diffClass + '">' + renderGroup(asstOnlyA, an.aIdx, modelA, { idPrefix: 'a-', ctx: ctxA, hideSaveBtn: true }) + '</div>';
-    scrollHtml += '<div class="sbs-cell right ' + diffClass + '">' + renderGroup(asstOnlyB, an.bIdx, modelB, { idPrefix: 'b-', ctx: ctxB, hideSaveBtn: true }) + '</div>';
+    scrollHtml += '<div class="sbs-cell left ' + diffClass + '">' + renderGroup(asstOnlyA, an.aIdx, modelA, { idPrefix: 'a-', ctx: ctxA, hideSaveBtn: true, label: 'Response A', previewText: '' }) + '</div>';
+    scrollHtml += '<div class="sbs-cell right ' + diffClass + '">' + renderGroup(asstOnlyB, an.bIdx, modelB, { idPrefix: 'b-', ctx: ctxB, hideSaveBtn: true, label: 'Response B', previewText: '' }) + '</div>';
 
     // Then the run that follows this anchor (unmatched turns between this and next anchor)
     var nextRun = anchorRes.runs[i + 1];
@@ -1705,6 +1712,7 @@ function ensureArray(v) {
   return [];
 }
 function trunc(s, n) { if (!s) return ''; s = String(s).trim(); return s.length > n ? s.slice(0, n) + '\n\u2026 (truncated)' : s; }
+function previewLine(s) { return (s || '').replace(/\s+/g, ' ').trim().slice(0, 300); }
 function contentToStr(c) {
   if (!c) return '';
   if (typeof c === 'string') return c;
